@@ -1,0 +1,59 @@
+baseURL: http://localhost:8888/api/v1
+auth:
+  - #ref/authParams
+paths:
+  - path: /users
+    method: get
+    desc: list users
+    authRequired: true
+    headers: #ref/ListUserHeader
+    requestType:
+    response: #ref/ListUserResponse
+  - path: /user
+    method: post
+    desc: create user
+    authRequired: true
+    response: #ref/CreateUserResponse
+  - path: /user/{id}
+    method: delete
+    desc: delete a user
+    request: #ref/DeleteUserRequest
+    response: #ref/DeleteUserResponse
+
+ref:
+  authParams:
+    - name: Authorization
+      in: header
+      type: string
+      required: true
+  listUserHeader:
+    - name:
+  ListUserResponse:
+    - type: array
+      items:
+        - name: username
+          type: string
+        - name: password
+          type: string
+        - name: age
+          type: number
+
+  CreateUserRequest:
+    - name: username
+      type: string
+      required: true
+      desc: user's name
+      in: body
+    - name: password
+      type: string
+      required: true
+      desc: user's password
+      in: body
+  CreateUserResponse:
+    - name: data
+      type: number
+      desc: user's id
+  DeleteUserRequest:
+    - name: id
+      in: path
+      required: true
