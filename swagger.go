@@ -1,59 +1,51 @@
-package ydoc
+package yidoc
 
-type Swagger struct {
-	Swagger             string                           `json:"swagger"`
-	Info                Info                             `json:"info"`
-	Host                string                           `json:"host"`
-	BasePath            string                           `json:"basePath"`
-	Schemes             []string                         `json:"schemes"` // "http", "https", "ws", "wss".
-	Consumes            []string                         `json:"consumes"`
-	Produces            []string                         `json:"produces"`
-	Paths               map[string]map[string]PathObject `json:"paths"`
-	Definitions         interface{}                      `json:"definitions"`
-	Parameters          interface{}                      `json:"parameters"`
-	Response            interface{}                      `json:"response"`
-	SecurityDefinitions interface{}                      `json:"securityDefinitions"`
-	Security            interface{}                      `json:"security"`
-	Tags                []string                         `json:"tags"`
-	ExteernalDocs       interface{}                      `json:"exteernalDocs"`
+import (
+	"github.com/go-openapi/spec"
+)
+
+type YiDoc struct {
+	swagger *spec.Swagger
+
+	paths map[string]map[string]*Path
 }
 
-type Info struct {
-	Title          string  `json:"title"` // required
-	Description    string  `json:"description"`
-	TermsOfService string  `json:"termsOfService"`
-	Contact        Contact `json:"contact"`
-	License        License `json:"license"`
-	Version        string  `json:"version"` // api version
+func New() *YiDoc {
+	return &YiDoc{
+		swagger: &spec.Swagger{},
+	}
 }
 
-type Contact struct {
-	Name  string `json:"name"`
-	Url   string `json:"url"`
-	Email string `json:"email"`
+type Path struct {
+	op *spec.Operation
 }
 
-type License struct {
-	Name string `json:"name"`
-	Url  string `json:"url"`
+func (y *YiDoc) AddPath(method string, path string) *Path {
+	if y.swagger.Paths == nil {
+		y.swagger.Paths = &spec.Paths{
+			Paths: map[string]spec.PathItem{},
+		}
+	}
+	if _, ok := y.paths[path]; !ok {
+		y.paths[path] = make(map[string]*Path)
+	}
+	ph := &Path{
+		op: &spec.Operation{},
+	}
+	y.paths[path][method] = ph
+
+	return ph
 }
 
-type PathObject struct {
-	Tags        []string `json:"tags"`
-	Summary     string   `json:"summary"`
-	Description string   `json:"description"`
-	//ExternalDocs []string `json:"externalDocs"`
-	OperationId string      `json:"operationId"` // must unique
-	Consumes    []string    `json:"consumes"`
-	Produces    []string    `json:"produces"`
-	Parameters  Parameter   `json:"parameters"`
-	Response    Response    `json:"response"`
-	Schemes     []string    `json:"schemes"`
-	Deprecated  bool        `json:"deprecated"`
-	Security    interface{} `json:"security"`
-}
-
-type Parameter interface{}
-
-type Response struct {
+func (p *Path) Query(arg Arg, args ...Arg) *Path {
+	p.op.AddParam(&spec.Parameter{
+		ParamProps: spec.ParamProps{
+			Description:     "",
+			Name:            "",
+			In:              "",
+			Required:        false,
+			Schema:          nil,
+			AllowEmptyValue: false,
+		},
+	})
 }

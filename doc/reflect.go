@@ -1,6 +1,9 @@
-package ydoc
+package doc
 
-import "reflect"
+import (
+	"github.com/go-openapi/spec"
+	"reflect"
+)
 
 const (
 	tagQuery = "query"

@@ -1,4 +1,4 @@
-package ydoc
+package doc
 
 type FieldType int
 

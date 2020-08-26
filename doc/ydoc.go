@@ -1,4 +1,4 @@
-package ydoc
+package doc
 
 import (
 	"github.com/gin-gonic/gin"
