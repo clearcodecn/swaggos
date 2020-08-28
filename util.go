@@ -1,5 +1,5 @@
 package yidoc
-
+/*
 func getDescAndRequired(v ...interface{}) (string, bool) {
 	var (
 		desc     string
@@ -13,3 +13,4 @@ func getDescAndRequired(v ...interface{}) (string, bool) {
 	}
 	return desc, required
 }
+*/
