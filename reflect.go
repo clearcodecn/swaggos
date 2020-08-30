@@ -4,6 +4,7 @@ import (
 	"github.com/go-openapi/spec"
 	. "reflect"
 	"strconv"
+	"strings"
 )
 
 const (
@@ -176,7 +177,7 @@ func parseStructFields(v Value) []*Object {
 	return objects
 }
 
-func (o *Object) buildSchema() spec.SchemaProps {
+func (o *Object) buildSchema(doc *YiDoc) spec.SchemaProps {
 	prop := spec.SchemaProps{
 		ID:         strconv.FormatInt(nextId(), 10),
 		Ref:        spec.Ref{},
@@ -206,7 +207,7 @@ func (o *Object) buildSchema() spec.SchemaProps {
 		case []*Object:
 			var schemas []spec.Schema
 			for _, ft := range fieldType {
-				props := ft.buildSchema()
+				props := ft.buildSchema(doc)
 				schemas = append(schemas, spec.Schema{
 					SchemaProps: props,
 				})
@@ -217,14 +218,31 @@ func (o *Object) buildSchema() spec.SchemaProps {
 		}
 	case dataTypeObject:
 		prop.Properties = make(spec.SchemaProperties)
-		for _, o := range o.ObjectFields {
-			name := getName(o.Typ)
-			prop.Properties
-			[]
+		for _, obj := range o.ObjectFields {
+			name := getName(obj.Typ, obj.StructField)
+			schema := spec.Schema{}
+			if obj.DataType == dataTypeObject {
+				prop := o.buildSchema(doc)
+				ref := doc.addModel(o.Typ, prop)
+				schema.SchemaProps.Ref = spec.MustCreateRef(ref)
+			} else {
+				schema.Type = spec.StringOrArray{obj.DataType}
+			}
+			prop.Properties[name] = schema
 		}
 	}
 }
 
-func getName(typ Type) string {
+func getName(typ Type, field StructField) string {
 	name := typ.Name()
+	jsonName := getTagName(field.Tag, "json")
+	if jsonName != "" {
+		name = jsonName
+	}
+	return name
+}
+
+func getTagName(tag StructTag, name string) string {
+	data := tag.Get(name)
+	return strings.Split(data, ",")[0]
 }

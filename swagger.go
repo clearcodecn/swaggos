@@ -44,6 +44,7 @@ type YiDoc struct {
 func NewDoc(opts ...Option) *YiDoc {
 	doc := new(YiDoc)
 	doc.packageDef = make(map[string]map[string]struct{})
+	doc.definitions = make(map[string]spec.Schema)
 	for _, o := range opts {
 		o(doc)
 	}
@@ -109,6 +110,17 @@ func (y *YiDoc) modelExist(typ reflect.Type) bool {
 		return true
 	}
 	return false
+}
+
+func (y *YiDoc) addModel(typ reflect.Type, props spec.SchemaProps) string {
+	name := typ.Name()
+	if !y.modelExist(typ) {
+		y.packageDef[typ.PkgPath()][name] = struct{}{}
+	}
+	y.definitions[name] = spec.Schema{
+		SchemaProps: props,
+	}
+	return name
 }
 
 /*
