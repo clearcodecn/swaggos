@@ -10,9 +10,7 @@ type Ref struct {
 	Ref2
 }
 
-type Ref2 struct {
-	Bar string `json:"bar"`
-}
+type Ref2 int
 
 func main() {
 	ref := new(Ref)

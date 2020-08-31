@@ -73,9 +73,29 @@ func (y *YiDoc) buildOnce() {
 }
 
 func (y *YiDoc) build() {
-	if y.doc == nil {
+	if y.doc != nil {
 		return
 	}
+	swagger := &spec.Swagger{
+		SwaggerProps: spec.SwaggerProps{
+			ID:                  "2.0",
+			Consumes:            y.consumes,
+			Produces:            y.produces,
+			Schemes:             y.schemes,
+			Swagger:             y.swagger,
+			Info:                y.info,
+			Host:                y.host,
+			BasePath:            y.basePath,
+			Paths:               y.paths,
+			Definitions:         y.definitions,
+			Parameters:          y.parameters,
+			Responses:           y.responses,
+			SecurityDefinitions: y.securityDefinitions,
+			Security:            y.security,
+			Tags:                y.tags,
+		},
+	}
+	y.doc = swagger
 }
 
 func (y *YiDoc) Model(v ...interface{}) {
@@ -95,10 +115,7 @@ func (y *YiDoc) buildModel(model interface{}) {
 
 	object := parseObject(model)
 	schema := object.buildSchema(y)
-}
-
-func (y *YiDoc) newId(typ reflect.Type) string {
-
+	y.addModel(typ, schema)
 }
 
 func (y *YiDoc) modelExist(typ reflect.Type) bool {

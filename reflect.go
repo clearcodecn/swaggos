@@ -45,13 +45,13 @@ func parseObject(v interface{}) *Object {
 	switch val.Kind() {
 	case Map, Interface:
 		obj.IsNull = true
-		obj.DataType = "Object"
+		obj.DataType = dataTypeObject
 	case Array, Slice:
-		obj.DataType = "array"
+		obj.DataType = dataTypeArray
 		elem := New(val.Type().Elem()).Elem()
 		obj.ArrayFields = parseArrayFields(elem)
 	case Struct:
-		obj.DataType = "Object"
+		obj.DataType = dataTypeObject
 		obj.ObjectFields = parseStructFields(val)
 	default:
 		obj = nil
@@ -66,13 +66,13 @@ func getBasicType(val Value) (*Object, ) {
 	obj.Typ = typ
 	switch typ.Kind() {
 	case Int, Int8, Int16, Int32, Int64, Uint, Uint8, Uint16, Uint32, Uint64, Uintptr:
-		obj.DataType = "integer"
+		obj.DataType = dataTypeInteger
 	case Float32, Float64:
-		obj.DataType = "number"
+		obj.DataType = dataTypeNumber
 	case Bool:
-		obj.DataType = "boolean"
+		obj.DataType = dataTypeBoolean
 	case String:
-		obj.DataType = "string"
+		obj.DataType = dataTypeString
 	default:
 		obj = nil
 	}
@@ -139,15 +139,17 @@ func parseStructFields(v Value) []*Object {
 		}
 
 		if basic := getBasicType(fieldVal); basic != nil {
+			basic.StructField = fieldType
 			objects = append(objects, basic)
 		} else {
 			switch fieldVal.Kind() {
 			case Map, Interface:
 				objects = append(objects, &Object{
-					Typ:      fieldVal.Type(),
-					Val:      fieldVal,
-					IsNull:   true,
-					DataType: "Object",
+					Typ:         fieldVal.Type(),
+					Val:         fieldVal,
+					IsNull:      true,
+					DataType:    dataTypeObject,
+					StructField: fieldType,
 				})
 			case Array, Slice:
 				t := fieldVal.Type().Elem()
@@ -157,16 +159,18 @@ func parseStructFields(v Value) []*Object {
 				obj := &Object{
 					Typ:         fieldVal.Type(),
 					Val:         fieldVal,
-					DataType:    "array",
+					DataType:    dataTypeArray,
 					ArrayFields: parseArrayFields(New(t).Elem()),
+					StructField: fieldType,
 				}
 				objects = append(objects, obj)
 			case Struct:
 				obj := &Object{
 					Typ:          fieldVal.Type(),
 					Val:          fieldVal,
-					DataType:     "Object",
+					DataType:     dataTypeObject,
 					ObjectFields: parseStructFields(fieldVal),
+					StructField:  fieldType,
 				}
 				objects = append(objects, obj)
 			default:
@@ -179,12 +183,7 @@ func parseStructFields(v Value) []*Object {
 
 func (o *Object) buildSchema(doc *YiDoc) spec.SchemaProps {
 	prop := spec.SchemaProps{
-		ID:         strconv.FormatInt(nextId(), 10),
-		Ref:        spec.Ref{},
-		Schema:     "",
-		Type:       nil,
-		Items:      nil,
-		Properties: nil,
+		ID: strconv.FormatInt(nextId(), 10),
 	}
 	if o.IsNull {
 		return prop
@@ -192,7 +191,6 @@ func (o *Object) buildSchema(doc *YiDoc) spec.SchemaProps {
 	switch o.DataType {
 	case dataTypeInteger, dataTypeString, dataTypeBoolean, dataTypeNumber, dataTypeFile:
 		prop.Type = spec.StringOrArray{o.DataType}
-		return prop
 	case dataTypeArray:
 		switch fieldType := o.ArrayFields.(type) {
 		case *Object:
@@ -203,7 +201,6 @@ func (o *Object) buildSchema(doc *YiDoc) spec.SchemaProps {
 					},
 				},
 			}
-			return prop
 		case []*Object:
 			var schemas []spec.Schema
 			for _, ft := range fieldType {
@@ -225,16 +222,20 @@ func (o *Object) buildSchema(doc *YiDoc) spec.SchemaProps {
 				prop := o.buildSchema(doc)
 				ref := doc.addModel(o.Typ, prop)
 				schema.SchemaProps.Ref = spec.MustCreateRef(ref)
+				prop.Properties[name] = schema
+			} else if obj.DataType == dataTypeArray {
+				schema.Type = spec.StringOrArray{obj.DataType}
+				prop = obj.buildSchema(doc)
 			} else {
 				schema.Type = spec.StringOrArray{obj.DataType}
 			}
-			prop.Properties[name] = schema
 		}
 	}
+	return prop
 }
 
 func getName(typ Type, field StructField) string {
-	name := typ.Name()
+	name := field.Name
 	jsonName := getTagName(field.Tag, "json")
 	if jsonName != "" {
 		name = jsonName

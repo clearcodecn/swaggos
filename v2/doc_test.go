@@ -1,7 +1,10 @@
-package yidoc
+package v2
 
 import (
+	"encoding/json"
 	"fmt"
+	"github.com/go-openapi/spec"
+	"net/http"
 	"testing"
 )
 
@@ -19,12 +22,12 @@ type ArrayMap []map[string]struct{}
 */
 
 type A struct {
-	Int                  int
+	Int                  int `json:"int" doc:"required,number,整型数据"`
 	Str                  string
 	IntArray             [3]int
 	IntString            [3]string
 	IntArrayArray        [][][][][][]int
-	ExampleArray         [][][][][][]ExampleObject
+	ExampleArray         [][][]ExampleObject
 	ExamplePtrArrayArray [][][][][][]*ExampleObject
 	ObjectArray          [3]ObjectTest
 	ObjectSlice          []*ExampleObject
@@ -58,39 +61,33 @@ type ExampleObject struct {
 	Password string
 }
 
-func TestParseObject(t *testing.T) {
-	a := new(A)
-	obj := parseObject(a)
+func TestYiDoc(t *testing.T) {
+	yd := new(YiDoc)
+	yd.Define("Object", new(A))
 
-	_ = obj
-
-	parseObject(Arr{})
-	parseObject(1)
-	parseObject("a")
-	parseObject(true)
-	parseObject(-1.1)
-	parseObject([]int{111})
-	parseObject(MAp{})
-	parseObject(ArrayMap{})
-	parseObject(Fun(func() {}))
+	def, err := json.MarshalIndent(yd.definitions, "", "  ")
+	fmt.Println(string(def), err)
 }
 
-type Request struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-	Response
-}
+func TestDocs(t *testing.T) {
+	d := NewYiDoc()
+	d.JWT("Token").
+		Oauth2("https://www.oauth2.com/token", []string{"openid"}, []string{"read", "write"}).
+		HostInfo("http://localhost:8899/", "/api/v1", spec.InfoProps{})
 
-type Response struct {
-	Age     int      `json:"age"`
-	Uge     int      `json:"uge"`
-	Arr     []string `json:"arr"`
-	Boolean bool     `json:"boolean"`
-}
+	d.Get("/{id}").Query("orderBy", Attribute{
+		Desc:     "排序",
+		Required: false,
+		Type:     "string",
+		Format:   "string",
+	}).
+		JSON(new(A))
 
-func TestSwagger(t *testing.T) {
-	doc := NewDoc(DefaultOptions()...)
-	doc.Model(Request{})
-	data, err := doc.Build()
-	fmt.Println(string(data), err)
+	data := d.Build()
+	fmt.Println(string(data))
+	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Access-Control-Allow-Origin", "*")
+		writer.Write(data)
+	})
+	http.ListenAndServe(":9991", nil)
 }

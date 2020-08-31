@@ -1,5 +1,6 @@
 package yidoc
 
+/*
 import (
 	"fmt"
 	"reflect"
@@ -78,3 +79,4 @@ type object struct{ value reflect.Value }
 
 func (o *object) Basic() ArgumentType     { return TypeObject }
 func newObject(v reflect.Value) fieldType { return &object{value: v} }
+*/
