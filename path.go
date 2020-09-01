@@ -204,7 +204,7 @@ func (p *Path) Header(name string, attribute Attribute) *Path {
 	return p
 }
 
-func (p *Path) Body(v interface{}, names ...string) {
+func (p *Path) Body(v interface{}, names ...string) *Path {
 	if p.paramDeep == inForm {
 		panic("body and form can't be set at same time")
 	}
@@ -223,8 +223,11 @@ func (p *Path) Body(v interface{}, names ...string) {
 					Ref: ref,
 				},
 			},
+			In:   InBody,
+			Name: "body",
 		},
 	})
+	return p
 }
 
 func (p *Path) JSON(v interface{}, names ...string) *Path {

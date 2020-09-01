@@ -33,7 +33,10 @@ func (a *Attribute) parseTag(t reflect.StructTag) {
 	a.Description = t.Get("description")
 	// required
 	a.Required = t.Get("nullable") == "true"
-	a.Example = t.Get("example")
+	example := t.Get("example")
+	if example != "" {
+		a.Example = example
+	}
 	a.Nullable = t.Get("nullable") == "true"
 	a.Format = t.Get("format")
 	a.Title = t.Get("title")

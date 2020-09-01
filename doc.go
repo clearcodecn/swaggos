@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/go-openapi/spec"
 	"reflect"
+	"strings"
 )
 
 type YiDoc struct {
@@ -15,6 +16,7 @@ type YiDoc struct {
 	info                spec.InfoProps
 	host                string
 	basePath            string
+	params              map[string]spec.Parameter
 }
 
 func (y *YiDoc) Define(name string, v interface{}) spec.Ref {
@@ -65,8 +67,11 @@ func (y *YiDoc) buildSchema(v interface{}) spec.Schema {
 
 	switch typ.Kind() {
 	case reflect.Array, reflect.Slice:
-		elVal := reflect.New(typ.Elem()).Elem()
-		elTyp := elVal.Type()
+		elTyp := typ.Elem()
+		if elTyp.Kind() == reflect.Ptr {
+			elTyp = elTyp.Elem()
+		}
+		elVal := reflect.New(elTyp).Elem()
 		if isBasicType(elTyp) {
 			schema := getBasicSchema(elTyp)
 			return spec.Schema{
@@ -91,6 +96,10 @@ func (y *YiDoc) buildSchema(v interface{}) spec.Schema {
 		}
 
 		if elTyp.Kind() == reflect.Slice || elTyp.Kind() == reflect.Array {
+			elTyp := typ.Elem()
+			if elTyp.Kind() == reflect.Ptr {
+				elTyp = elTyp.Elem()
+			}
 			val := reflect.New(elTyp.Elem()).Elem()
 			schema := y.buildSchema(val.Interface())
 			return spec.Schema{
@@ -102,13 +111,10 @@ func (y *YiDoc) buildSchema(v interface{}) spec.Schema {
 				},
 			}
 		}
-
 		return spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Type: spec.StringOrArray{"array"},
-				Items: &spec.SchemaOrArray{
-					Schema: &spec.Schema{},
-				},
+				Type:  spec.StringOrArray{"array"},
+				Items: &spec.SchemaOrArray{},
 			},
 		}
 	case reflect.Struct:
@@ -156,17 +162,21 @@ func (y *YiDoc) buildStructSchema(v interface{}) spec.Schema {
 		if tg.ignore() {
 			continue
 		}
-		name := trimName(typ.Field(i).Name)
+		fieldName := typ.Field(i).Name
+		fieldTypeName := trimName(fieldType.String())
+		if strings.Contains(fieldTypeName,"interface {}") {
+			fieldTypeName = "Object"
+		}
 		required := tg.required()
 		if required {
-			schema.Required = append(schema.Required, name)
+			schema.Required = append(schema.Required, fieldName)
 		}
 		var prop spec.Schema
 		if isBasicType(fieldType) {
 			prop = getBasicSchema(fieldType)
 		} else {
 			fieldSchema := y.buildSchema(field.Interface())
-			ref := y.addDefine(name, fieldSchema)
+			ref := y.addDefine(fieldTypeName, fieldSchema)
 			prop = spec.Schema{
 				SchemaProps: spec.SchemaProps{
 					Ref: ref,
@@ -174,7 +184,7 @@ func (y *YiDoc) buildStructSchema(v interface{}) spec.Schema {
 			}
 		}
 		prop = tg.mergeSchema(prop)
-		schema.Properties[name] = prop
+		schema.Properties[fieldName] = prop
 	}
 	return schema
 }
@@ -221,10 +231,6 @@ func getBasicSchema(typ reflect.Type) spec.Schema {
 	}
 }
 
-func getFieldTypeName(typ reflect.Type) string {
-	return typ.String()
-}
-
 func isExport(name string) bool {
 	if len(name) == 0 {
 		return false
@@ -233,6 +239,9 @@ func isExport(name string) bool {
 }
 
 func trimName(name string) string {
+	// trim prefix
+	arr := strings.Split(name, ".")
+	name = arr[len(arr)-1]
 loop:
 	var (
 		open  int = -1

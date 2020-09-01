@@ -22,9 +22,18 @@ func (y *YiDoc) Patch(path string) *Path   { return y.addPath(http.MethodPatch, 
 func (y *YiDoc) Options(path string) *Path { return y.addPath(http.MethodOptions, path) }
 func (y *YiDoc) Delete(path string) *Path  { return y.addPath(http.MethodDelete, path) }
 
+func (y *YiDoc) trimPath(path string) string {
+	if len(path) == 0 {
+		path = "/"
+	}
+	if path[0] != '/' {
+		path = "/" + path
+	}
+	return strings.TrimPrefix(path, y.basePath)
+}
+
 func (y *YiDoc) addPath(method string, path string) *Path {
-	path = "/" + strings.TrimPrefix(path, "/")
-	path = strings.TrimPrefix(y.basePath, path)
+	path = y.trimPath(path)
 	if _, ok := y.paths[path]; !ok {
 		y.paths[path] = make(map[string]*Path)
 	}
@@ -38,12 +47,6 @@ func (y *YiDoc) addPath(method string, path string) *Path {
 }
 
 func (y *YiDoc) JWT(keyName string) *YiDoc {
-	if y.securityDefinitions == nil {
-		y.securityDefinitions = make(map[string]*spec.SecurityScheme)
-	}
-	if y.security == nil {
-		y.security = make([]map[string][]string, 0)
-	}
 	def := spec.SecurityScheme{
 		SecuritySchemeProps: spec.SecuritySchemeProps{
 			Description: "jwt token",
@@ -52,19 +55,7 @@ func (y *YiDoc) JWT(keyName string) *YiDoc {
 			In:          "header",
 		},
 	}
-	var exist bool
-	y.securityDefinitions[keyName] = &def
-	for _, m := range y.security {
-		if _, ok := m[keyName]; ok {
-			exist = true
-			break
-		}
-	}
-	if !exist {
-		y.security = append(y.security, map[string][]string{
-			keyName: nil,
-		})
-	}
+	y.addAuth(keyName, &def, nil)
 	return y
 }
 
@@ -76,26 +67,42 @@ func (y *YiDoc) Oauth2(tokenURL string, scopes []string, permits []string) *YiDo
 	for _, scope := range scopes {
 		oauth2.AddScope(scope, "")
 	}
+	y.addAuth("Oauth2", oauth2, map[string][]string{
+		"Oauth2": permits,
+	})
+	return y
+}
+
+func (y *YiDoc) Header(name string, desc string, required bool) {
+	if y.params == nil {
+		y.params = make(map[string]spec.Parameter)
+	}
+	if _, ok := y.params[name]; ok {
+		panic(fmt.Errorf("repeated header param: %s", name))
+	}
+	param := spec.Parameter{
+		ParamProps: spec.ParamProps{
+			Description: desc,
+			Name:        name,
+			In:          InHeader,
+			Required:    required,
+		},
+	}
+	y.params[name] = param
+}
+
+func (y *YiDoc) addAuth(key string, schema *spec.SecurityScheme, security map[string][]string) {
 	if y.securityDefinitions == nil {
 		y.securityDefinitions = make(map[string]*spec.SecurityScheme)
 	}
 	if y.security == nil {
 		y.security = make([]map[string][]string, 0)
 	}
-	y.securityDefinitions["Oauth2"] = oauth2
-	var exist bool
-	for _, m := range y.security {
-		if _, ok := m["Oauth2"]; ok {
-			exist = true
-			break
-		}
+	y.securityDefinitions[key] = schema
+	if security == nil {
+		security = make(map[string][]string)
 	}
-	if !exist {
-		y.security = append(y.security, map[string][]string{
-			"Oauth2": permits,
-		})
-	}
-	return y
+	y.security = append(y.security, security)
 }
 
 func (y *YiDoc) HostInfo(host string, basePath string, info spec.InfoProps) *YiDoc {
@@ -118,6 +125,7 @@ func (y *YiDoc) Build() ([]byte, error) {
 			Definitions:         y.definitions,
 			SecurityDefinitions: y.securityDefinitions,
 			Security:            y.security,
+			Parameters:          y.params,
 		},
 	}
 	data, err := json.MarshalIndent(swag, "", " ")
@@ -148,6 +156,14 @@ func (y *YiDoc) buildPaths() *spec.Paths {
 				pi.Delete = operate
 			case http.MethodOptions:
 				pi.Options = operate
+			}
+
+			for name := range y.params {
+				pi.PathItemProps.Parameters = append(pi.PathItemProps.Parameters, spec.Parameter{
+					Refable: spec.Refable{
+						Ref: spec.MustCreateRef("#/parameters/" + name),
+					},
+				})
 			}
 			paths.Paths[path] = pi
 		}

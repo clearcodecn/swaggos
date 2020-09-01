@@ -22,14 +22,16 @@ func main() {
 		context.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 	})
 	info := spec.InfoProps{
-		Version:        "0.1",
-		Title:          "api",
-		Description:    "api for group server,",
-		Contact:        &spec.ContactInfo{ContactInfoProps: spec.ContactInfoProps{Name: "developer", Email: "vardump@foxmail.com"}},
+		Version:     "0.1",
+		Title:       "api",
+		Description: "api for group server,",
+		Contact:     &spec.ContactInfo{ContactInfoProps: spec.ContactInfoProps{Name: "developer", Email: "vardump@foxmail.com"}},
 	}
 	doc.HostInfo("localhost:9999", "/api/v1", info).
 		Oauth2("https://oauth.token.url", []string{"openid"}, []string{"openid"}).
 		JWT("Authorization")
+
+	doc.Header("X-Group-Id", "group id", true)
 
 	gr := g.Group("/api/v1")
 	{
@@ -48,8 +50,16 @@ func main() {
 			}).
 			JSON(new(model.Group)).
 			BadRequest(new(BadReqErr))
-	}
 
+
+		gr.POST("/group/create/2", helloHandler).
+			Summary("group").
+			Description("create a new group").
+			Tag("group").
+			Body(new(model.Item)).
+			JSON(new(model.Group)).
+			BadRequest(new(BadReqErr))
+	}
 	g.ServeDoc()
 	g.Gin().Run(":9992")
 }
