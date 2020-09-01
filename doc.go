@@ -1,4 +1,4 @@
-package v2
+package yidoc
 
 import (
 	"fmt"
@@ -156,28 +156,25 @@ func (y *YiDoc) buildStructSchema(v interface{}) spec.Schema {
 		if tg.ignore() {
 			continue
 		}
-		name := tg.name()
-		if name == "" {
-			name = typ.Field(i).Name
-		}
+		name := trimName(typ.Field(i).Name)
 		required := tg.required()
 		if required {
 			schema.Required = append(schema.Required, name)
 		}
+		var prop spec.Schema
 		if isBasicType(fieldType) {
-			prop := getBasicSchema(fieldType)
-			schema.Properties[name] = prop
-			continue
+			prop = getBasicSchema(fieldType)
 		} else {
 			fieldSchema := y.buildSchema(field.Interface())
-			ref := y.addDefine(getFieldTypeName(typ.Field(i).Type), fieldSchema)
-			schema.Properties[name] = spec.Schema{
+			ref := y.addDefine(name, fieldSchema)
+			prop = spec.Schema{
 				SchemaProps: spec.SchemaProps{
 					Ref: ref,
 				},
 			}
 		}
-
+		prop = tg.mergeSchema(prop)
+		schema.Properties[name] = prop
 	}
 	return schema
 }
@@ -233,4 +230,25 @@ func isExport(name string) bool {
 		return false
 	}
 	return name[0] >= 'A' && name[0] <= 'Z'
+}
+
+func trimName(name string) string {
+loop:
+	var (
+		open  int = -1
+		close int = -1
+	)
+	for i := 0; i < len(name); i++ {
+		if name[i] == '[' {
+			open = i
+		}
+		if name[i] == ']' {
+			close = i
+		}
+		if open != -1 && close != -1 {
+			name = name[:open] + "Array" + name[close+1:]
+			goto loop
+		}
+	}
+	return name
 }

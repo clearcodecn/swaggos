@@ -1,195 +1,156 @@
 package yidoc
 
 import (
-	"bytes"
 	"encoding/json"
+	"fmt"
 	"github.com/go-openapi/spec"
-	"gopkg.in/yaml.v2"
-	"reflect"
-	"sync"
-	"sync/atomic"
+	"net/http"
+	"strings"
 )
 
-var (
-	_id int64
-)
-
-func nextId() int64 {
-	return atomic.AddInt64(&_id, 1)
-}
-
-type YiDoc struct {
-	consumes            []string
-	produces            []string
-	schemes             []string
-	swagger             string
-	info                *spec.Info
-	host                string
-	basePath            string
-	paths               *spec.Paths
-	definitions         spec.Definitions
-	parameters          map[string]spec.Parameter
-	responses           map[string]spec.Response
-	securityDefinitions spec.SecurityDefinitions
-	security            []map[string][]string
-	tags                []spec.Tag
-	externalDocs        *spec.ExternalDocumentation
-
-	o   sync.Once
-	doc *spec.Swagger
-
-	packageDef map[string]map[string]struct{} // package -> type
-}
-
-func NewDoc(opts ...Option) *YiDoc {
+func NewYiDoc() *YiDoc {
 	doc := new(YiDoc)
-	doc.packageDef = make(map[string]map[string]struct{})
-	doc.definitions = make(map[string]spec.Schema)
-	for _, o := range opts {
-		o(doc)
-	}
+	doc.definitions = make(spec.Definitions)
+	doc.paths = make(map[string]map[string]*Path)
 	return doc
 }
 
-func (y *YiDoc) Build() ([]byte, error) {
-	y.buildOnce()
-	return json.Marshal(y.doc)
-}
+func (y *YiDoc) Get(path string) *Path     { return y.addPath(http.MethodGet, path) }
+func (y *YiDoc) Post(path string) *Path    { return y.addPath(http.MethodPost, path) }
+func (y *YiDoc) Put(path string) *Path     { return y.addPath(http.MethodPut, path) }
+func (y *YiDoc) Patch(path string) *Path   { return y.addPath(http.MethodPatch, path) }
+func (y *YiDoc) Options(path string) *Path { return y.addPath(http.MethodOptions, path) }
+func (y *YiDoc) Delete(path string) *Path  { return y.addPath(http.MethodDelete, path) }
 
-func (y *YiDoc) BuildYaml() ([]byte, error) {
-	y.buildOnce()
-	var buf = bytes.NewBuffer(nil)
-	err := yaml.NewEncoder(buf).Encode(y.doc)
-	if err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
-}
-
-func (y *YiDoc) buildOnce() {
-	y.o.Do(func() {
-		y.build()
-	})
-}
-
-func (y *YiDoc) build() {
-	if y.doc != nil {
-		return
-	}
-	swagger := &spec.Swagger{
-		SwaggerProps: spec.SwaggerProps{
-			ID:                  "2.0",
-			Consumes:            y.consumes,
-			Produces:            y.produces,
-			Schemes:             y.schemes,
-			Swagger:             y.swagger,
-			Info:                y.info,
-			Host:                y.host,
-			BasePath:            y.basePath,
-			Paths:               y.paths,
-			Definitions:         y.definitions,
-			Parameters:          y.parameters,
-			Responses:           y.responses,
-			SecurityDefinitions: y.securityDefinitions,
-			Security:            y.security,
-			Tags:                y.tags,
-		},
-	}
-	y.doc = swagger
-}
-
-func (y *YiDoc) Model(v ...interface{}) {
-	for _, m := range v {
-		y.buildModel(m)
-	}
-}
-
-func (y *YiDoc) buildModel(model interface{}) {
-	typ := reflect.TypeOf(model)
-	name := typ.Name()
-	if !y.modelExist(typ) {
-		y.packageDef[typ.PkgPath()][name] = struct{}{}
-	}
-
-	y.packageDef[typ.PkgPath()][name] = struct{}{}
-
-	object := parseObject(model)
-	schema := object.buildSchema(y)
-	y.addModel(typ, schema)
-}
-
-func (y *YiDoc) modelExist(typ reflect.Type) bool {
-	if _, ok := y.packageDef[typ.PkgPath()]; !ok {
-		y.packageDef[typ.PkgPath()] = make(map[string]struct{})
-	}
-	// already exist
-	if _, ok := y.packageDef[typ.PkgPath()][typ.Name()]; ok {
-		return true
-	}
-	return false
-}
-
-func (y *YiDoc) addModel(typ reflect.Type, props spec.SchemaProps) string {
-	name := typ.Name()
-	if !y.modelExist(typ) {
-		y.packageDef[typ.PkgPath()][name] = struct{}{}
-	}
-	y.definitions[name] = spec.Schema{
-		SchemaProps: props,
-	}
-	return name
-}
-
-/*
-import (
-	"github.com/go-openapi/spec"
-)
-
-type YiDoc struct {
-	swagger *spec.Swagger
-
-	paths map[string]map[string]*Path
-}
-
-func New() *YiDoc {
-	return &YiDoc{
-		swagger: &spec.Swagger{},
-	}
-}
-
-type Path struct {
-	op *spec.Operation
-}
-
-func (y *YiDoc) AddPath(method string, path string) *Path {
-	if y.swagger.Paths == nil {
-		y.swagger.Paths = &spec.Paths{
-			Paths: map[string]spec.PathItem{},
-		}
-	}
+func (y *YiDoc) addPath(method string, path string) *Path {
+	path = "/" + strings.TrimPrefix(path, "/")
+	path = strings.TrimPrefix(y.basePath, path)
 	if _, ok := y.paths[path]; !ok {
 		y.paths[path] = make(map[string]*Path)
 	}
-	ph := &Path{
-		op: &spec.Operation{},
+	if _, ok := y.paths[path][method]; ok {
+		panic(fmt.Errorf("repeated method&path: %s %s", method, path))
 	}
-	y.paths[path][method] = ph
-
-	return ph
+	p := newPath(y)
+	y.paths[path][method] = p
+	p.parsePath(path)
+	return p
 }
 
-func (p *Path) Query(arg Arg, args ...Arg) *Path {
-	//p.op.AddParam(&spec.Parameter{
-	//	ParamProps: spec.ParamProps{
-	//		Description:     "",
-	//		Name:            "",
-	//		In:              "",
-	//		Required:        false,
-	//		Schema:          nil,
-	//		AllowEmptyValue: false,
-	//	},
-	//})
-
-	return nil
+func (y *YiDoc) JWT(keyName string) *YiDoc {
+	if y.securityDefinitions == nil {
+		y.securityDefinitions = make(map[string]*spec.SecurityScheme)
+	}
+	if y.security == nil {
+		y.security = make([]map[string][]string, 0)
+	}
+	def := spec.SecurityScheme{
+		SecuritySchemeProps: spec.SecuritySchemeProps{
+			Description: "jwt token",
+			Type:        "apiKey",
+			Name:        keyName,
+			In:          "header",
+		},
+	}
+	var exist bool
+	y.securityDefinitions[keyName] = &def
+	for _, m := range y.security {
+		if _, ok := m[keyName]; ok {
+			exist = true
+			break
+		}
+	}
+	if !exist {
+		y.security = append(y.security, map[string][]string{
+			keyName: nil,
+		})
+	}
+	return y
 }
-*/
+
+func (y *YiDoc) Oauth2(tokenURL string, scopes []string, permits []string) *YiDoc {
+	oauth2 := spec.OAuth2Password(tokenURL)
+	if len(scopes) == 0 {
+		scopes = []string{"openid"}
+	}
+	for _, scope := range scopes {
+		oauth2.AddScope(scope, "")
+	}
+	if y.securityDefinitions == nil {
+		y.securityDefinitions = make(map[string]*spec.SecurityScheme)
+	}
+	if y.security == nil {
+		y.security = make([]map[string][]string, 0)
+	}
+	y.securityDefinitions["Oauth2"] = oauth2
+	var exist bool
+	for _, m := range y.security {
+		if _, ok := m["Oauth2"]; ok {
+			exist = true
+			break
+		}
+	}
+	if !exist {
+		y.security = append(y.security, map[string][]string{
+			"Oauth2": permits,
+		})
+	}
+	return y
+}
+
+func (y *YiDoc) HostInfo(host string, basePath string, info spec.InfoProps) *YiDoc {
+	y.info = info
+	y.host = host
+	y.basePath = basePath
+	return y
+}
+
+func (y *YiDoc) Build() ([]byte, error) {
+	swag := spec.Swagger{
+		SwaggerProps: spec.SwaggerProps{
+			Consumes:            []string{applicationJson},
+			Produces:            []string{applicationJson},
+			Swagger:             "2.0",
+			Info:                &spec.Info{InfoProps: y.info},
+			Host:                y.host,
+			BasePath:            y.basePath,
+			Paths:               y.buildPaths(),
+			Definitions:         y.definitions,
+			SecurityDefinitions: y.securityDefinitions,
+			Security:            y.security,
+		},
+	}
+	data, err := json.MarshalIndent(swag, "", " ")
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+func (y *YiDoc) buildPaths() *spec.Paths {
+	paths := &spec.Paths{Paths: map[string]spec.PathItem{}}
+	for path, items := range y.paths {
+		for method, item := range items {
+			var operate = item.build()
+			pi := spec.PathItem{
+				PathItemProps: spec.PathItemProps{},
+			}
+			switch method {
+			case http.MethodGet:
+				pi.Get = operate
+			case http.MethodPut:
+				pi.Put = operate
+			case http.MethodPost:
+				pi.Post = operate
+			case http.MethodPatch:
+				pi.Patch = operate
+			case http.MethodDelete:
+				pi.Delete = operate
+			case http.MethodOptions:
+				pi.Options = operate
+			}
+			paths.Paths[path] = pi
+		}
+	}
+	return paths
+}

@@ -1,9 +1,10 @@
-package v2
+package yidoc
 
 import (
 	"encoding/json"
 	"fmt"
 	"github.com/go-openapi/spec"
+	"github.com/stretchr/testify/require"
 	"net/http"
 	"testing"
 )
@@ -40,7 +41,7 @@ type A struct {
 	Arr
 	ObjectOne ObjectTest
 	AS
-	Fun
+	Fun `json:"-"`
 }
 
 type ObjectTest struct {
@@ -73,18 +74,22 @@ func TestDocs(t *testing.T) {
 	d := NewYiDoc()
 	d.JWT("Token").
 		Oauth2("https://www.oauth2.com/token", []string{"openid"}, []string{"read", "write"}).
-		HostInfo("http://localhost:8899/", "/api/v1", spec.InfoProps{})
+		HostInfo("localhost:8899", "/api/v1", spec.InfoProps{})
 
 	d.Get("/{id}").Query("orderBy", Attribute{
-		Desc:     "排序",
-		Required: false,
-		Type:     "string",
-		Format:   "string",
+		Description: "排序",
+		Required:    false,
+		Type:        "string",
+		Format:      "string",
 	}).
+		Description("排序的用户").
+		Tag("orders").
+		Summary("排序").
 		JSON(new(A))
 
-	data := d.Build()
+	data, err := d.Build()
 	fmt.Println(string(data))
+	require.Nil(t, err)
 	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Set("Access-Control-Allow-Origin", "*")
 		writer.Write(data)

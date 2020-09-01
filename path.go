@@ -1,4 +1,4 @@
-package v2
+package yidoc
 
 import (
 	"github.com/go-openapi/spec"
@@ -82,21 +82,13 @@ func (p *Path) parsePath(path string) {
 					Type: String,
 				},
 				ParamProps: spec.ParamProps{
-					Name: name,
-					In:   InPath,
+					Name:     name,
+					In:       InPath,
+					Required: true,
 				},
 			})
 		}
 	}
-}
-
-type Attribute struct {
-	Desc     string
-	Required bool
-	Type     AttributeType
-	Format   Format
-	Default  interface{}
-	Example  interface{}
 }
 
 func (p *Path) Form(name string, attribute Attribute) *Path {
@@ -112,12 +104,32 @@ func (p *Path) Form(name string, attribute Attribute) *Path {
 			Example: attribute.Example,
 		},
 		ParamProps: spec.ParamProps{
-			Description: attribute.Desc,
+			Description: attribute.Description,
 			Name:        name,
 			In:          InForm,
 			Required:    attribute.Required,
 		},
 	})
+	return p
+}
+
+func (p *Path) FormObject(v interface{}) *Path {
+	if p.paramDeep == inBody {
+		panic("body and form can't be set at same time")
+	}
+	p.paramDeep = inForm
+	ref := p.doc.buildSchema(v)
+	for name, sch := range ref.SchemaProps.Properties {
+		var param = spec.Parameter{
+			SimpleSchema: spec.SimpleSchema{},
+			ParamProps: spec.ParamProps{
+				Name:   name,
+				In:     InForm,
+				Schema: &sch,
+			},
+		}
+		p.prop.Parameters = append(p.prop.Parameters, param)
+	}
 	return p
 }
 
@@ -131,7 +143,7 @@ func (p *Path) FormFile(name string, attribute Attribute) *Path {
 			Type: File,
 		},
 		ParamProps: spec.ParamProps{
-			Description: attribute.Desc,
+			Description: attribute.Description,
 			Name:        name,
 			In:          InForm,
 			Required:    attribute.Required,
@@ -149,12 +161,28 @@ func (p *Path) Query(name string, attribute Attribute) *Path {
 			Example: attribute.Example,
 		},
 		ParamProps: spec.ParamProps{
-			Description: attribute.Desc,
+			Description: attribute.Description,
 			Name:        name,
 			In:          InQuery,
 			Required:    attribute.Required,
 		},
 	})
+	return p
+}
+
+func (p *Path) QueryObject(v interface{}) *Path {
+	ref := p.doc.buildSchema(v)
+	for name, sch := range ref.SchemaProps.Properties {
+		var param = spec.Parameter{
+			SimpleSchema: spec.SimpleSchema{},
+			ParamProps: spec.ParamProps{
+				Name:   name,
+				In:     InQuery,
+				Schema: &sch,
+			},
+		}
+		p.prop.Parameters = append(p.prop.Parameters, param)
+	}
 	return p
 }
 
@@ -167,7 +195,7 @@ func (p *Path) Header(name string, attribute Attribute) *Path {
 			Example: attribute.Example,
 		},
 		ParamProps: spec.ParamProps{
-			Description: attribute.Desc,
+			Description: attribute.Description,
 			Name:        name,
 			In:          InHeader,
 			Required:    attribute.Required,
@@ -181,7 +209,7 @@ func (p *Path) Body(v interface{}, names ...string) {
 		panic("body and form can't be set at same time")
 	}
 	p.paramDeep = inBody
-	refName := reflect.TypeOf(v).Name()
+	refName := reflect.Indirect(reflect.ValueOf(v)).Type().Name()
 	if len(names) > 0 {
 		if len(names) > 0 {
 			refName = names[0]
@@ -199,8 +227,8 @@ func (p *Path) Body(v interface{}, names ...string) {
 	})
 }
 
-func (p *Path) JSON(v interface{}, names ...string) {
-	refName := reflect.TypeOf(v).Name()
+func (p *Path) JSON(v interface{}, names ...string) *Path {
+	refName := reflect.Indirect(reflect.ValueOf(v)).Type().Name()
 	if len(names) > 0 {
 		if len(names) > 0 {
 			refName = names[0]
@@ -221,16 +249,11 @@ func (p *Path) JSON(v interface{}, names ...string) {
 		},
 	}
 	p.response[200] = resp
-	//p.prop.Responses = &spec.Responses{
-	//	ResponsesProps: spec.ResponsesProps{
-	//		Default:             &resp,
-	//		StatusCodeResponses: p.response,
-	//	},
-	//}
+	return p
 }
 
-func (p *Path) BadRequest(v interface{}, names ...string) {
-	refName := reflect.TypeOf(v).Name()
+func (p *Path) BadRequest(v interface{}, names ...string) *Path {
+	refName := reflect.Indirect(reflect.ValueOf(v)).Type().Name()
 	if len(names) > 0 {
 		if len(names) > 0 {
 			refName = names[0]
@@ -250,10 +273,11 @@ func (p *Path) BadRequest(v interface{}, names ...string) {
 			},
 		},
 	}
+	return p
 }
 
-func (p *Path) ServerError(v interface{}, names ...string) {
-	refName := reflect.TypeOf(v).Name()
+func (p *Path) ServerError(v interface{}, names ...string) *Path {
+	refName := reflect.Indirect(reflect.ValueOf(v)).Type().Name()
 	if len(names) > 0 {
 		if len(names) > 0 {
 			refName = names[0]
@@ -273,10 +297,11 @@ func (p *Path) ServerError(v interface{}, names ...string) {
 			},
 		},
 	}
+	return p
 }
 
-func (p *Path) Forbidden(v interface{}, names ...string) {
-	refName := reflect.TypeOf(v).Name()
+func (p *Path) Forbidden(v interface{}, names ...string) *Path {
+	refName := reflect.Indirect(reflect.ValueOf(v)).Type().Name()
 	if len(names) > 0 {
 		if len(names) > 0 {
 			refName = names[0]
@@ -296,17 +321,67 @@ func (p *Path) Forbidden(v interface{}, names ...string) {
 			},
 		},
 	}
+	return p
 }
 
-func (p *Path) Tag(v ...string) {
+func (p *Path) UnAuthorization(v interface{}, names ...string) *Path {
+	refName := reflect.Indirect(reflect.ValueOf(v)).Type().Name()
+	if len(names) > 0 {
+		if len(names) > 0 {
+			refName = names[0]
+		}
+	}
+	ref := p.doc.Define(refName, v)
+	p.response[401] = spec.Response{
+		ResponseProps: spec.ResponseProps{
+			Description: "json response",
+			Schema: &spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Ref: ref,
+				},
+			},
+			Examples: map[string]interface{}{
+				applicationJson: v,
+			},
+		},
+	}
+	return p
+}
+
+func (p *Path) Tag(v ...string) *Path {
 	p.prop.Tags = v
+	return p
 }
 
-func (p *Path) Summary(v string) {
+func (p *Path) Summary(v string) *Path {
 	p.prop.Summary = v
+	return p
+}
+
+func (p *Path) Description(s string) *Path {
+	p.prop.Description = s
+	return p
 }
 
 func (p *Path) ContentType(req, resp string) {
 	p.prop.Consumes = []string{req}
 	p.prop.Produces = []string{resp}
+}
+
+func (p *Path) build() *spec.Operation {
+	var (
+		defaultResponse *spec.Response
+	)
+	if resp, ok := p.response[200]; ok {
+		defaultResponse = &resp
+	}
+	p.prop.Responses = &spec.Responses{
+		ResponsesProps: spec.ResponsesProps{
+			Default:             defaultResponse,
+			StatusCodeResponses: p.response,
+		},
+	}
+	return &spec.Operation{
+		OperationProps: p.prop,
+	}
 }
