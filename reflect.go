@@ -85,44 +85,75 @@ func (y *YiDoc) buildSchema(v interface{}) spec.Schema {
 		}
 		if elTyp.Kind() == reflect.Struct {
 			schema := y.buildSchema(elVal.Interface())
-			return spec.Schema{
+			ref := y.addDefine(elVal.Type().Name(), schema)
+			ret := spec.Schema{
 				SchemaProps: spec.SchemaProps{
 					Type: spec.StringOrArray{"array"},
 					Items: &spec.SchemaOrArray{
-						Schema: &schema,
+						Schema: &spec.Schema{
+							SchemaProps: spec.SchemaProps{
+								Ref: ref,
+							},
+						},
 					},
 				},
 			}
+			return ret
 		}
 
-		if elTyp.Kind() == reflect.Slice || elTyp.Kind() == reflect.Array {
-			elTyp := typ.Elem()
-			if elTyp.Kind() == reflect.Ptr {
-				elTyp = elTyp.Elem()
-			}
-			val := reflect.New(elTyp.Elem()).Elem()
-			schema := y.buildSchema(val.Interface())
-			return spec.Schema{
-				SchemaProps: spec.SchemaProps{
-					Type: spec.StringOrArray{"array"},
-					Items: &spec.SchemaOrArray{
-						Schema: &schema,
-					},
-				},
-			}
-		}
-		return spec.Schema{
+		var prop = spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Type:  spec.StringOrArray{"array"},
 				Items: &spec.SchemaOrArray{},
 			},
 		}
+		typ, lastSchema := arrayProps(elTyp, &prop)
+		if isBasicType(typ) {
+			basic := getBasicSchema(typ)
+			lastSchema.Items = &spec.SchemaOrArray{
+				Schema: &basic,
+			}
+		} else {
+			schema := y.buildSchema(reflect.New(typ).Elem().Interface())
+			ref := y.addDefine(typ.Name(), schema)
+			lastSchema.Items = &spec.SchemaOrArray{
+				Schema: &spec.Schema{
+					SchemaProps: spec.SchemaProps{
+						Ref: ref,
+					},
+				},
+			}
+		}
+		return prop
 	case reflect.Struct:
 		return y.buildStructSchema(v)
 	case reflect.Map, reflect.Interface:
 		return spec.Schema{}
 	}
 	return spec.Schema{}
+}
+
+func arrayProps(typ reflect.Type, schema *spec.Schema) (reflect.Type, *spec.Schema) {
+	var currentSchema = schema
+	for typ.Kind() == reflect.Slice || typ.Kind() == reflect.Array {
+		typ = typ.Elem()
+		if typ.Kind() == reflect.Ptr {
+			typ = typ.Elem()
+		}
+		sch := &spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Type:  spec.StringOrArray{"array"},
+				Items: &spec.SchemaOrArray{},
+			},
+		}
+		currentSchema = sch
+		schema.SchemaProps.Items = &spec.SchemaOrArray{
+			Schema: sch,
+		}
+		elVal := reflect.New(typ).Elem()
+		return arrayProps(elVal.Type(), currentSchema)
+	}
+	return typ, currentSchema
 }
 
 // val is struct value
@@ -164,7 +195,7 @@ func (y *YiDoc) buildStructSchema(v interface{}) spec.Schema {
 		}
 		fieldName := typ.Field(i).Name
 		fieldTypeName := trimName(fieldType.String())
-		if strings.Contains(fieldTypeName,"interface {}") {
+		if strings.Contains(fieldTypeName, "interface {}") {
 			fieldTypeName = "Object"
 		}
 		required := tg.required()
@@ -175,13 +206,7 @@ func (y *YiDoc) buildStructSchema(v interface{}) spec.Schema {
 		if isBasicType(fieldType) {
 			prop = getBasicSchema(fieldType)
 		} else {
-			fieldSchema := y.buildSchema(field.Interface())
-			ref := y.addDefine(fieldTypeName, fieldSchema)
-			prop = spec.Schema{
-				SchemaProps: spec.SchemaProps{
-					Ref: ref,
-				},
-			}
+			prop = y.buildSchema(field.Interface())
 		}
 		prop = tg.mergeSchema(prop)
 		schema.Properties[fieldName] = prop

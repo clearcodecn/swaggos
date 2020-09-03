@@ -6,6 +6,7 @@ import (
 	"github.com/go-openapi/spec"
 	"github.com/stretchr/testify/require"
 	"net/http"
+	"reflect"
 	"testing"
 )
 
@@ -95,4 +96,23 @@ func TestDocs(t *testing.T) {
 		writer.Write(data)
 	})
 	http.ListenAndServe(":9991", nil)
+}
+
+type ArrayTest struct {
+	//ObjectArray      []Object
+	ObjectArrayArray [][][][]Object
+}
+
+type Object struct {
+	Attr string `json:"attr"`
+}
+
+func TestBuildSchema(t *testing.T) {
+	y := NewYiDoc()
+	v := new(ArrayTest)
+
+	refName := reflect.Indirect(reflect.ValueOf(v)).Type().Name()
+	y.Define(refName, v)
+	data, _ := y.Build()
+	fmt.Println(string(data))
 }
