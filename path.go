@@ -2,29 +2,14 @@ package yidoc
 
 import (
 	"github.com/go-openapi/spec"
-	"reflect"
 	"strings"
 )
 
 const applicationJson = "application/json"
 
 const (
-	inPath = iota + 1
-	inQuery
-	inForm
+	inForm = iota + 1
 	inBody
-	inHeader
-)
-
-type AttributeType string
-
-const (
-	String  = "string"
-	Number  = "number"
-	Integer = "integer"
-	Boolean = "boolean"
-	Array   = "array"
-	File    = "file"
 )
 
 const (
@@ -33,20 +18,6 @@ const (
 	InBody   = "body"
 	InHeader = "header"
 	InForm   = "formData"
-)
-
-type Format string
-
-const (
-	Int32    Format = "int32"
-	Int64           = "int64"
-	Float           = "float"
-	Double          = "double"
-	Byte            = "byte"
-	Binary          = "binary"
-	Date            = "date"
-	DateTime        = "date-time"
-	Password        = "password"
 )
 
 type Path struct {
@@ -88,6 +59,44 @@ func (p *Path) parsePath(path string) {
 				},
 			})
 		}
+	}
+}
+
+func (p *Path) Tag(v ...string) *Path {
+	p.prop.Tags = v
+	return p
+}
+
+func (p *Path) Summary(v string) *Path {
+	p.prop.Summary = v
+	return p
+}
+
+func (p *Path) Description(s string) *Path {
+	p.prop.Description = s
+	return p
+}
+
+func (p *Path) ContentType(req, resp string) {
+	p.prop.Consumes = []string{req}
+	p.prop.Produces = []string{resp}
+}
+
+func (p *Path) build() *spec.Operation {
+	var (
+		defaultResponse *spec.Response
+	)
+	if resp, ok := p.response[200]; ok {
+		defaultResponse = &resp
+	}
+	p.prop.Responses = &spec.Responses{
+		ResponsesProps: spec.ResponsesProps{
+			Default:             defaultResponse,
+			StatusCodeResponses: p.response,
+		},
+	}
+	return &spec.Operation{
+		OperationProps: p.prop,
 	}
 }
 
@@ -204,18 +213,12 @@ func (p *Path) Header(name string, attribute Attribute) *Path {
 	return p
 }
 
-func (p *Path) Body(v interface{}, names ...string) *Path {
+func (p *Path) Body(v interface{}) *Path {
 	if p.paramDeep == inForm {
 		panic("body and form can't be set at same time")
 	}
 	p.paramDeep = inBody
-	refName := reflect.Indirect(reflect.ValueOf(v)).Type().Name()
-	if len(names) > 0 {
-		if len(names) > 0 {
-			refName = names[0]
-		}
-	}
-	ref := p.doc.Define(refName, v)
+	ref := p.doc.Define(v)
 	p.prop.Parameters = append(p.prop.Parameters, spec.Parameter{
 		ParamProps: spec.ParamProps{
 			Schema: &spec.Schema{
@@ -224,21 +227,44 @@ func (p *Path) Body(v interface{}, names ...string) *Path {
 				},
 			},
 			In:   InBody,
-			Name: "body",
+			Name: InBody,
 		},
 	})
 	return p
 }
 
-func (p *Path) JSON(v interface{}, names ...string) *Path {
-	refName := reflect.Indirect(reflect.ValueOf(v)).Type().Name()
-	if len(names) > 0 {
-		if len(names) > 0 {
-			refName = names[0]
-		}
-	}
-	ref := p.doc.Define(refName, v)
-	resp := spec.Response{
+func (p *Path) JSON(v interface{}) *Path {
+	ref := p.doc.Define(v)
+	p.addResponse(200, ref, v)
+	return p
+}
+
+func (p *Path) BadRequest(v interface{}) *Path {
+	ref := p.doc.Define(v)
+	p.addResponse(400, ref, v)
+	return p
+}
+
+func (p *Path) ServerError(v interface{}) *Path {
+	ref := p.doc.Define(v)
+	p.addResponse(500, ref, v)
+	return p
+}
+
+func (p *Path) Forbidden(v interface{}) *Path {
+	ref := p.doc.Define(v)
+	p.addResponse(403, ref, v)
+	return p
+}
+
+func (p *Path) UnAuthorization(v interface{}) *Path {
+	ref := p.doc.Define(v)
+	p.addResponse(401, ref, v)
+	return p
+}
+
+func (p *Path) addResponse(status int, ref spec.Ref, example interface{}) {
+	p.response[status] = spec.Response{
 		ResponseProps: spec.ResponseProps{
 			Description: "json response",
 			Schema: &spec.Schema{
@@ -247,144 +273,8 @@ func (p *Path) JSON(v interface{}, names ...string) *Path {
 				},
 			},
 			Examples: map[string]interface{}{
-				applicationJson: v,
+				applicationJson: example,
 			},
 		},
-	}
-	p.response[200] = resp
-	return p
-}
-
-func (p *Path) BadRequest(v interface{}, names ...string) *Path {
-	refName := reflect.Indirect(reflect.ValueOf(v)).Type().Name()
-	if len(names) > 0 {
-		if len(names) > 0 {
-			refName = names[0]
-		}
-	}
-	ref := p.doc.Define(refName, v)
-	p.response[400] = spec.Response{
-		ResponseProps: spec.ResponseProps{
-			Description: "json response",
-			Schema: &spec.Schema{
-				SchemaProps: spec.SchemaProps{
-					Ref: ref,
-				},
-			},
-			Examples: map[string]interface{}{
-				applicationJson: v,
-			},
-		},
-	}
-	return p
-}
-
-func (p *Path) ServerError(v interface{}, names ...string) *Path {
-	refName := reflect.Indirect(reflect.ValueOf(v)).Type().Name()
-	if len(names) > 0 {
-		if len(names) > 0 {
-			refName = names[0]
-		}
-	}
-	ref := p.doc.Define(refName, v)
-	p.response[500] = spec.Response{
-		ResponseProps: spec.ResponseProps{
-			Description: "json response",
-			Schema: &spec.Schema{
-				SchemaProps: spec.SchemaProps{
-					Ref: ref,
-				},
-			},
-			Examples: map[string]interface{}{
-				applicationJson: v,
-			},
-		},
-	}
-	return p
-}
-
-func (p *Path) Forbidden(v interface{}, names ...string) *Path {
-	refName := reflect.Indirect(reflect.ValueOf(v)).Type().Name()
-	if len(names) > 0 {
-		if len(names) > 0 {
-			refName = names[0]
-		}
-	}
-	ref := p.doc.Define(refName, v)
-	p.response[403] = spec.Response{
-		ResponseProps: spec.ResponseProps{
-			Description: "json response",
-			Schema: &spec.Schema{
-				SchemaProps: spec.SchemaProps{
-					Ref: ref,
-				},
-			},
-			Examples: map[string]interface{}{
-				applicationJson: v,
-			},
-		},
-	}
-	return p
-}
-
-func (p *Path) UnAuthorization(v interface{}, names ...string) *Path {
-	refName := reflect.Indirect(reflect.ValueOf(v)).Type().Name()
-	if len(names) > 0 {
-		if len(names) > 0 {
-			refName = names[0]
-		}
-	}
-	ref := p.doc.Define(refName, v)
-	p.response[401] = spec.Response{
-		ResponseProps: spec.ResponseProps{
-			Description: "json response",
-			Schema: &spec.Schema{
-				SchemaProps: spec.SchemaProps{
-					Ref: ref,
-				},
-			},
-			Examples: map[string]interface{}{
-				applicationJson: v,
-			},
-		},
-	}
-	return p
-}
-
-func (p *Path) Tag(v ...string) *Path {
-	p.prop.Tags = v
-	return p
-}
-
-func (p *Path) Summary(v string) *Path {
-	p.prop.Summary = v
-	return p
-}
-
-func (p *Path) Description(s string) *Path {
-	p.prop.Description = s
-	return p
-}
-
-func (p *Path) ContentType(req, resp string) {
-	p.prop.Consumes = []string{req}
-	p.prop.Produces = []string{resp}
-}
-
-func (p *Path) build() *spec.Operation {
-	var (
-		defaultResponse *spec.Response
-	)
-	if resp, ok := p.response[200]; ok {
-		defaultResponse = &resp
-	}
-	p.prop.Responses = &spec.Responses{
-		ResponsesProps: spec.ResponsesProps{
-			Default:             defaultResponse,
-			StatusCodeResponses: p.response,
-		},
-	}
-	return &spec.Operation{
-		OperationProps: p.prop,
 	}
 }

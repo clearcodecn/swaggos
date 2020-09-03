@@ -17,54 +17,77 @@ type YiDoc struct {
 	host                string
 	basePath            string
 	params              map[string]spec.Parameter
+
+	typeNames map[reflect.Type]string
 }
 
-func (y *YiDoc) Define(name string, v interface{}) spec.Ref {
-	if y.definitions == nil {
-		y.definitions = make(spec.Definitions)
-	}
+// Define defines a object or a array to swagger definitions area.
+// it will find all sub-items and build them into swagger tree.
+// it returns the definitions ref.
+func (y *YiDoc) Define(v interface{}) spec.Ref {
 	schema := y.buildSchema(v)
-	return y.addDefine(name, schema)
+	return y.addDefinition(v, schema)
 }
 
-func (y *YiDoc) addDefine(name string, v spec.Schema) spec.Ref {
-	if y.defExist(name) {
-		panic(fmt.Errorf("repeated: %s definition", name))
+// addDefinition add a definition to swagger definitions.
+// the name will get from the given type.
+// if name's name is repeated, will add package path prefix to the name until name is unique.
+func (y *YiDoc) addDefinition(t interface{}, v spec.Schema) spec.Ref {
+	var (
+		name string
+		typ  reflect.Type
+	)
+	switch tt := t.(type) {
+	case reflect.Type:
+		typ = tt
+	case reflect.Value:
+		typ = tt.Type()
+	default:
+		typ = reflect.TypeOf(t)
+		if typ == nil {
+			typ = reflect.TypeOf(new(interface{}))
+		} else {
+			typ = reflect.Indirect(reflect.ValueOf(t)).Type()
+		}
+	}
+	name = typ.Name()
+	if y.typeNames == nil {
+		y.typeNames = make(map[reflect.Type]string)
+	}
+	if name, ok := y.typeNames[typ]; ok {
+		return definitionRef(name)
+	}
+	pkgPath := strings.Split(typ.PkgPath(), "/")
+	subName := name
+	i := 0
+	for {
+		// create a newName. like pkgName
+		if _, ok := y.definitions[subName]; ok {
+			prefix := pkgPath[len(pkgPath)-i]
+			subName = fmt.Sprintf("%s.%s", prefix, name)
+			i++
+		} else {
+			name = subName
+			break
+		}
 	}
 	y.definitions[name] = v
-	return spec.MustCreateRef("#/definitions/" + name)
-}
-
-func (y *YiDoc) defExist(name string) bool {
-	if y.definitions == nil {
-		y.definitions = make(spec.Definitions)
-	}
-	// def 都么有，那么package就不可能重复
-	if _, ok := y.definitions[name]; !ok {
-		return false
-	}
-	return false
+	y.typeNames[typ] = name
+	return definitionRef(name)
 }
 
 func (y *YiDoc) buildSchema(v interface{}) spec.Schema {
 	typ := reflect.TypeOf(v)
+	// if given nil interface{}, typ is nil, then we return a empty object schema
 	if typ == nil {
-		return spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Type: spec.StringOrArray{"object"},
-			},
-		}
+		return emptyObjectSchema()
 	}
 	if typ.Kind() == reflect.Ptr {
-		v = reflect.New(reflect.TypeOf(v).Elem()).Interface()
+		typ = typ.Elem()
 	}
-	val := reflect.Indirect(reflect.ValueOf(v))
-	typ = val.Type()
-
 	if isBasicType(typ) {
-		return getBasicSchema(typ)
+		return basicSchema(typ)
 	}
-
 	switch typ.Kind() {
 	case reflect.Array, reflect.Slice:
 		elTyp := typ.Elem()
@@ -72,115 +95,78 @@ func (y *YiDoc) buildSchema(v interface{}) spec.Schema {
 			elTyp = elTyp.Elem()
 		}
 		elVal := reflect.New(elTyp).Elem()
+
+		// basicArray
 		if isBasicType(elTyp) {
-			schema := getBasicSchema(elTyp)
-			return spec.Schema{
-				SchemaProps: spec.SchemaProps{
-					Type: spec.StringOrArray{"array"},
-					Items: &spec.SchemaOrArray{
-						Schema: &schema,
-					},
-				},
-			}
-		}
-		if elTyp.Kind() == reflect.Struct {
-			schema := y.buildSchema(elVal.Interface())
-			ref := y.addDefine(elVal.Type().Name(), schema)
-			ret := spec.Schema{
-				SchemaProps: spec.SchemaProps{
-					Type: spec.StringOrArray{"array"},
-					Items: &spec.SchemaOrArray{
-						Schema: &spec.Schema{
-							SchemaProps: spec.SchemaProps{
-								Ref: ref,
-							},
-						},
-					},
-				},
-			}
-			return ret
+			schema := basicSchema(elTyp)
+			return arraySchema(&schema)
 		}
 
-		var prop = spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Type:  spec.StringOrArray{"array"},
-				Items: &spec.SchemaOrArray{},
-			},
+		// structArray
+		if elTyp.Kind() == reflect.Struct {
+			schema := y.buildSchema(elVal.Interface())
+			ref := y.addDefinition(elVal, schema)
+			return arraySchemaRef(ref)
 		}
-		typ, lastSchema := arrayProps(elTyp, &prop)
-		if isBasicType(typ) {
-			basic := getBasicSchema(typ)
-			lastSchema.Items = &spec.SchemaOrArray{
+		var arraySchema = emptyArray()
+		childType, childSchema := arrayProps(elTyp, &arraySchema)
+		if isBasicType(childType) {
+			basic := basicSchema(childType)
+			childSchema.Items = &spec.SchemaOrArray{
 				Schema: &basic,
 			}
 		} else {
-			schema := y.buildSchema(reflect.New(typ).Elem().Interface())
-			ref := y.addDefine(typ.Name(), schema)
-			lastSchema.Items = &spec.SchemaOrArray{
-				Schema: &spec.Schema{
-					SchemaProps: spec.SchemaProps{
-						Ref: ref,
-					},
-				},
-			}
+			schema := y.buildSchema(reflect.New(childType).Elem().Interface())
+			ref := y.addDefinition(childType, schema)
+			childSchema.Items = refArraySchema(ref)
 		}
-		return prop
+		return arraySchema
 	case reflect.Struct:
 		return y.buildStructSchema(v)
 	case reflect.Map, reflect.Interface:
-		return spec.Schema{}
+		// TODO:: handle map schema
+		return emptyObjectSchema()
 	}
-	return spec.Schema{}
-}
-
-func arrayProps(typ reflect.Type, schema *spec.Schema) (reflect.Type, *spec.Schema) {
-	var currentSchema = schema
-	for typ.Kind() == reflect.Slice || typ.Kind() == reflect.Array {
-		typ = typ.Elem()
-		if typ.Kind() == reflect.Ptr {
-			typ = typ.Elem()
-		}
-		sch := &spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Type:  spec.StringOrArray{"array"},
-				Items: &spec.SchemaOrArray{},
-			},
-		}
-		currentSchema = sch
-		schema.SchemaProps.Items = &spec.SchemaOrArray{
-			Schema: sch,
-		}
-		elVal := reflect.New(typ).Elem()
-		return arrayProps(elVal.Type(), currentSchema)
-	}
-	return typ, currentSchema
+	return emptyObjectSchema()
 }
 
 // val is struct value
 func (y *YiDoc) buildStructSchema(v interface{}) spec.Schema {
-	val := reflect.Indirect(reflect.ValueOf(v))
-	typ := val.Type()
+	typ := reflect.TypeOf(v)
+	val := reflect.ValueOf(v)
+	// if given nil interface{}, typ is nil, then we return a empty object schema
+	if typ == nil {
+		return emptyObjectSchema()
+	}
+	if typ.Kind() == reflect.Ptr {
+		typ = typ.Elem()
+		val = reflect.Indirect(reflect.New(typ))
+	}
 	if typ.Kind() != reflect.Struct {
 		panic(fmt.Errorf("interface{} is not struct: %T", v))
 	}
 	var schema spec.Schema
 	schema.Properties = make(spec.SchemaProperties)
-	schema.Type = spec.StringOrArray{"object"}
+	schema.Type = spec.StringOrArray{Object}
 	for i := 0; i < typ.NumField(); i++ {
 		field := val.Field(i)
 		fieldType := field.Type()
 		if !isExport(typ.Field(i).Name) {
 			continue
 		}
-		// 匿名字段.
-		// 检查是否有json tag，如果没有，则合并这些字段到struct上面.
-		if typ.Field(i).Anonymous && typ.Field(i).Tag.Get("json") == "" {
+		tg := newTags(typ.Field(i).Tag)
+		if tg.ignore() {
+			continue
+		}
+		// Anonymous field, if there are json tag on the field. then we say it's a object reference.
+		// if it's basic type, add it to properties directly, else we build it.
+		if typ.Field(i).Anonymous && tg.jsonTag() == "" {
 			if isBasicType(fieldType) {
-				prop := getBasicSchema(fieldType)
+				prop := basicSchema(fieldType)
 				schema.Properties[typ.Field(i).Name] = prop
 				continue
 			} else {
-				// TODO:: merge attributes in one.
+				// TODO:: if the field is a array type. what should we do here???
 				fieldSchema := y.buildSchema(field.Interface())
 				for name, val := range fieldSchema.Properties {
 					schema.Properties[name] = val
@@ -189,22 +175,16 @@ func (y *YiDoc) buildStructSchema(v interface{}) spec.Schema {
 			}
 			continue
 		}
-		tg := newTags(typ.Field(i).Tag)
-		if tg.ignore() {
-			continue
-		}
 		fieldName := typ.Field(i).Name
-		fieldTypeName := trimName(fieldType.String())
-		if strings.Contains(fieldTypeName, "interface {}") {
-			fieldTypeName = "Object"
+		if name := tg.jsonName(); name != "" {
+			fieldName = name
 		}
-		required := tg.required()
-		if required {
+		if tg.required() {
 			schema.Required = append(schema.Required, fieldName)
 		}
 		var prop spec.Schema
 		if isBasicType(fieldType) {
-			prop = getBasicSchema(fieldType)
+			prop = basicSchema(fieldType)
 		} else {
 			prop = y.buildSchema(field.Interface())
 		}
@@ -212,77 +192,4 @@ func (y *YiDoc) buildStructSchema(v interface{}) spec.Schema {
 		schema.Properties[fieldName] = prop
 	}
 	return schema
-}
-
-func isBasicType(typ reflect.Type) bool {
-	switch typ.Kind() {
-	case reflect.String, reflect.Bool, reflect.Int, reflect.Int64, reflect.Int8, reflect.Int32, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr, reflect.UnsafePointer, reflect.Float64, reflect.Float32:
-		return true
-	default:
-		return false
-	}
-}
-
-func getBasicSchema(typ reflect.Type) spec.Schema {
-	switch typ.Kind() {
-	case reflect.Bool:
-		return spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Type: spec.StringOrArray{"boolean"},
-			},
-		}
-	case reflect.Int, reflect.Int64, reflect.Int8, reflect.Int32, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr, reflect.UnsafePointer:
-		return spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Type:   spec.StringOrArray{Integer},
-				Format: string(Int64),
-			},
-		}
-	case reflect.Float64, reflect.Float32:
-		return spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Type:   spec.StringOrArray{Number},
-				Format: string(Float),
-			},
-		}
-	case reflect.String:
-		return spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Type: spec.StringOrArray{String},
-			},
-		}
-	default:
-		return spec.Schema{}
-	}
-}
-
-func isExport(name string) bool {
-	if len(name) == 0 {
-		return false
-	}
-	return name[0] >= 'A' && name[0] <= 'Z'
-}
-
-func trimName(name string) string {
-	// trim prefix
-	arr := strings.Split(name, ".")
-	name = arr[len(arr)-1]
-loop:
-	var (
-		open  int = -1
-		close int = -1
-	)
-	for i := 0; i < len(name); i++ {
-		if name[i] == '[' {
-			open = i
-		}
-		if name[i] == ']' {
-			close = i
-		}
-		if open != -1 && close != -1 {
-			name = name[:open] + "Array" + name[close+1:]
-			goto loop
-		}
-	}
-	return name
 }

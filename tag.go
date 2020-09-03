@@ -33,12 +33,20 @@ func (t *documentTag) ignore() bool {
 	return t.attribute.Ignore
 }
 
+func (t *documentTag) jsonTag() string {
+	return t.tag.Get("json")
+}
+
 func (t *documentTag) required() bool {
 	return t.attribute.Required
 }
 
 func (t *documentTag) Attribute() *Attribute {
 	return t.attribute
+}
+
+func (t *documentTag) jsonName() string {
+	return t.attribute.Json
 }
 
 func (t *documentTag) mergeSchema(schema spec.Schema) spec.Schema {

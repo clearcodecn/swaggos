@@ -7,11 +7,11 @@ import (
 )
 
 type Attribute struct {
-	Model       string        `json:"model"`
-	Description string        `json:"description"`
-	Required    bool          `json:"required"`
-	Type        AttributeType `json:"type"`
-	Example     interface{}   `json:"example"`
+	Model       string      `json:"model"`
+	Description string      `json:"description"`
+	Required    bool        `json:"required"`
+	Type        string      `json:"type"`
+	Example     interface{} `json:"example"`
 
 	Nullable  bool          `json:"nullable,omitempty"`
 	Format    string        `json:"format,omitempty"`
