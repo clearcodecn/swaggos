@@ -1,4 +1,4 @@
-package yidoc
+package swaggos
 
 import (
 	"reflect"
@@ -82,4 +82,14 @@ func str2i64Ptr(s string) *int64 {
 	}
 	f, _ := strconv.ParseInt(s, 10, 64)
 	return &f
+}
+
+// DescRequired description and required
+func DescRequired(desc string, required bool) Attribute {
+	return Attribute{Description: desc, Required: required}
+}
+
+// DescRequiredDefault description and default value
+func DescRequiredDefault(desc string, required bool, def interface{}) Attribute {
+	return Attribute{Description: desc, Required: required, Default: def}
 }

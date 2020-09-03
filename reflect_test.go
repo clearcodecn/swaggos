@@ -1,9 +1,9 @@
-package yidoc
+package swaggos
 
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/go-openapi/spec"
+	"github.com/clearcodecn/swaggos/examples/pkg"
 	"github.com/stretchr/testify/require"
 	"net/http"
 	"testing"
@@ -14,13 +14,6 @@ type Arr []string
 type MAp map[string]struct{}
 type Fun func()
 type ArrayMap []map[string]struct{}
-
-/**
-{
-	type: string
-	name: "",
-}
-*/
 
 type A struct {
 	Int                  int `json:"int" doc:"required,number,整型数据"`
@@ -63,7 +56,7 @@ type ExampleObject struct {
 }
 
 func TestYiDoc(t *testing.T) {
-	yd := new(YiDoc)
+	yd := new(Swaggo)
 	yd.Define(new(A))
 
 	def, err := json.MarshalIndent(yd.definitions, "", "  ")
@@ -71,10 +64,10 @@ func TestYiDoc(t *testing.T) {
 }
 
 func TestDocs(t *testing.T) {
-	d := NewYiDoc()
+	d := NewSwaggo()
 	d.JWT("Token").
 		Oauth2("https://www.oauth2.com/token", []string{"openid"}, []string{"read", "write"}).
-		HostInfo("localhost:8899", "/api/v1", spec.InfoProps{})
+		HostInfo("localhost:8899", "/api/v1")
 
 	d.Get("/{id}").Query("orderBy", Attribute{
 		Description: "排序",
@@ -108,12 +101,52 @@ type TObject struct {
 }
 
 func TestBuildSchema(t *testing.T) {
-	y := NewYiDoc()
+	y := NewSwaggo()
 	v := new(ArrayTest)
 	y.Define(v)
 	data, _ := y.Build()
 	fmt.Println(string(data))
 }
 
-func TestReflect(t *testing.T) {
+type UserX struct {
+	Username string
+	Password string
+}
+
+func TestDocs2(t *testing.T) {
+	d := NewSwaggo()
+	d.JWT("Token").
+		Oauth2("https://www.oauth2.com/token", []string{"openid"}, []string{"read", "write"}).
+		HostInfo("localhost:8899", "/api/v1")
+
+	d.Get("/{id}").Query("orderBy", Attribute{
+		Description: "排序",
+		Required:    false,
+		Type:        "string",
+		Format:      "string",
+	}).
+		Description("排序的用户").
+		Tag("orders").
+		Summary("排序").
+		JSON([]UserX{})
+
+	d.Delete("/{id}").Query("orderBy", Attribute{
+		Description: "排序",
+		Required:    false,
+		Type:        "string",
+		Format:      "string",
+	}).
+		JSON([]pkg.UserX{})
+
+	d.Post("/{id}").Body([]pkg.UserX{}).
+		JSON([]pkg.UserX{})
+
+	data, err := d.Build()
+	fmt.Println(string(data))
+	require.Nil(t, err)
+	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Access-Control-Allow-Origin", "*")
+		writer.Write(data)
+	})
+	http.ListenAndServe(":9991", nil)
 }

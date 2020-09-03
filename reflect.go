@@ -1,30 +1,15 @@
-package yidoc
+package swaggos
 
 import (
 	"fmt"
 	"github.com/go-openapi/spec"
 	"reflect"
-	"strings"
 )
-
-type YiDoc struct {
-	definitions spec.Definitions
-	paths       map[string]map[string]*Path
-
-	securityDefinitions spec.SecurityDefinitions
-	security            []map[string][]string
-	info                spec.InfoProps
-	host                string
-	basePath            string
-	params              map[string]spec.Parameter
-
-	typeNames map[reflect.Type]string
-}
 
 // Define defines a object or a array to swagger definitions area.
 // it will find all sub-items and build them into swagger tree.
 // it returns the definitions ref.
-func (y *YiDoc) Define(v interface{}) spec.Ref {
+func (y *Swaggo) Define(v interface{}) spec.Ref {
 	schema := y.buildSchema(v)
 	return y.addDefinition(v, schema)
 }
@@ -32,7 +17,7 @@ func (y *YiDoc) Define(v interface{}) spec.Ref {
 // addDefinition add a definition to swagger definitions.
 // the name will get from the given type.
 // if name's name is repeated, will add package path prefix to the name until name is unique.
-func (y *YiDoc) addDefinition(t interface{}, v spec.Schema) spec.Ref {
+func (y *Swaggo) addDefinition(t interface{}, v spec.Schema) spec.Ref {
 	var (
 		name string
 		typ  reflect.Type
@@ -49,17 +34,22 @@ func (y *YiDoc) addDefinition(t interface{}, v spec.Schema) spec.Ref {
 		} else {
 			typ = reflect.Indirect(reflect.ValueOf(t)).Type()
 		}
+		if typ.Kind() == reflect.Slice || typ.Kind() == reflect.Array {
+			name = fmt.Sprintf("%sArray", typ.Elem().Name())
+		}
 	}
-	name = typ.Name()
+	if name == "" {
+		name = typ.Name()
+	}
 	if y.typeNames == nil {
 		y.typeNames = make(map[reflect.Type]string)
 	}
 	if name, ok := y.typeNames[typ]; ok {
 		return definitionRef(name)
 	}
-	pkgPath := strings.Split(typ.PkgPath(), "/")
+	pkgPath := pkgPath(typ)
 	subName := name
-	i := 0
+	i := 1
 	for {
 		// create a newName. like pkgName
 		if _, ok := y.definitions[subName]; ok {
@@ -76,7 +66,7 @@ func (y *YiDoc) addDefinition(t interface{}, v spec.Schema) spec.Ref {
 	return definitionRef(name)
 }
 
-func (y *YiDoc) buildSchema(v interface{}) spec.Schema {
+func (y *Swaggo) buildSchema(v interface{}) spec.Schema {
 	typ := reflect.TypeOf(v)
 	// if given nil interface{}, typ is nil, then we return a empty object schema
 	if typ == nil {
@@ -131,7 +121,7 @@ func (y *YiDoc) buildSchema(v interface{}) spec.Schema {
 }
 
 // val is struct value
-func (y *YiDoc) buildStructSchema(v interface{}) spec.Schema {
+func (y *Swaggo) buildStructSchema(v interface{}) spec.Schema {
 	typ := reflect.TypeOf(v)
 	val := reflect.ValueOf(v)
 	// if given nil interface{}, typ is nil, then we return a empty object schema

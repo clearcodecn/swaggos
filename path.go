@@ -1,4 +1,4 @@
-package yidoc
+package swaggos
 
 import (
 	"github.com/go-openapi/spec"
@@ -26,10 +26,10 @@ type Path struct {
 	response  map[int]spec.Response
 	paramDeep int
 
-	doc *YiDoc
+	doc *Swaggo
 }
 
-func newPath(d *YiDoc) *Path {
+func newPath(d *Swaggo) *Path {
 	path := new(Path)
 	path.response = make(map[int]spec.Response)
 	path.paramDeep = 0

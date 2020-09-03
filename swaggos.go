@@ -1,39 +1,65 @@
-package yidoc
+package swaggos
 
 import (
 	"encoding/json"
 	"fmt"
 	"github.com/go-openapi/spec"
 	"net/http"
+	"reflect"
 	"strings"
 )
 
-func NewYiDoc() *YiDoc {
-	doc := new(YiDoc)
+type Swaggo struct {
+	definitions spec.Definitions
+	paths       map[string]map[string]*Path
+
+	securityDefinitions spec.SecurityDefinitions
+	security            []map[string][]string
+	info                spec.InfoProps
+	host                string
+	basePath            string
+	params              map[string]spec.Parameter
+	schemas             []string
+
+	typeNames map[reflect.Type]string
+	produces  []string
+	consumes  []string
+}
+
+func NewSwaggo(option ...Option) *Swaggo {
+	doc := new(Swaggo)
 	doc.definitions = make(spec.Definitions)
 	doc.paths = make(map[string]map[string]*Path)
+	for _, o := range option {
+		o(doc)
+	}
 	return doc
 }
 
-func (y *YiDoc) Get(path string) *Path     { return y.addPath(http.MethodGet, path) }
-func (y *YiDoc) Post(path string) *Path    { return y.addPath(http.MethodPost, path) }
-func (y *YiDoc) Put(path string) *Path     { return y.addPath(http.MethodPut, path) }
-func (y *YiDoc) Patch(path string) *Path   { return y.addPath(http.MethodPatch, path) }
-func (y *YiDoc) Options(path string) *Path { return y.addPath(http.MethodOptions, path) }
-func (y *YiDoc) Delete(path string) *Path  { return y.addPath(http.MethodDelete, path) }
-
-func (y *YiDoc) trimPath(path string) string {
-	if len(path) == 0 {
-		path = "/"
-	}
-	if path[0] != '/' {
-		path = "/" + path
-	}
-	return strings.TrimPrefix(path, y.basePath)
+// Default create a default swaggo instanence.
+func Default() *Swaggo {
+	return NewSwaggo(DefaultOptions()...)
 }
 
-func (y *YiDoc) addPath(method string, path string) *Path {
-	path = y.trimPath(path)
+// Get add a get path operation.
+func (y *Swaggo) Get(path string) *Path { return y.addPath(http.MethodGet, path) }
+
+// Post add a post path operation.
+func (y *Swaggo) Post(path string) *Path { return y.addPath(http.MethodPost, path) }
+
+// Put add a put operation
+func (y *Swaggo) Put(path string) *Path { return y.addPath(http.MethodPut, path) }
+
+// Patch add a patch operation.
+func (y *Swaggo) Patch(path string) *Path { return y.addPath(http.MethodPatch, path) }
+
+// Options add a options operation
+func (y *Swaggo) Options(path string) *Path { return y.addPath(http.MethodOptions, path) }
+
+// Delete add a delete operation
+func (y *Swaggo) Delete(path string) *Path { return y.addPath(http.MethodDelete, path) }
+
+func (y *Swaggo) addPath(method string, path string) *Path {
 	if _, ok := y.paths[path]; !ok {
 		y.paths[path] = make(map[string]*Path)
 	}
@@ -46,7 +72,8 @@ func (y *YiDoc) addPath(method string, path string) *Path {
 	return p
 }
 
-func (y *YiDoc) JWT(keyName string) *YiDoc {
+// JWT create a jwt header
+func (y *Swaggo) JWT(keyName string) *Swaggo {
 	def := spec.SecurityScheme{
 		SecuritySchemeProps: spec.SecuritySchemeProps{
 			Description: "jwt token",
@@ -59,7 +86,8 @@ func (y *YiDoc) JWT(keyName string) *YiDoc {
 	return y
 }
 
-func (y *YiDoc) Oauth2(tokenURL string, scopes []string, permits []string) *YiDoc {
+// Oauth2 create a oauth2 header
+func (y *Swaggo) Oauth2(tokenURL string, scopes []string, permits []string) *Swaggo {
 	oauth2 := spec.OAuth2Password(tokenURL)
 	if len(scopes) == 0 {
 		scopes = []string{"openid"}
@@ -73,7 +101,8 @@ func (y *YiDoc) Oauth2(tokenURL string, scopes []string, permits []string) *YiDo
 	return y
 }
 
-func (y *YiDoc) Header(name string, desc string, required bool) {
+// Header add a custom header
+func (y *Swaggo) Header(name string, desc string, required bool) {
 	if y.params == nil {
 		y.params = make(map[string]spec.Parameter)
 	}
@@ -91,7 +120,7 @@ func (y *YiDoc) Header(name string, desc string, required bool) {
 	y.params[name] = param
 }
 
-func (y *YiDoc) addAuth(key string, schema *spec.SecurityScheme, security map[string][]string) {
+func (y *Swaggo) addAuth(key string, schema *spec.SecurityScheme, security map[string][]string) {
 	if y.securityDefinitions == nil {
 		y.securityDefinitions = make(map[string]*spec.SecurityScheme)
 	}
@@ -105,18 +134,33 @@ func (y *YiDoc) addAuth(key string, schema *spec.SecurityScheme, security map[st
 	y.security = append(y.security, security)
 }
 
-func (y *YiDoc) HostInfo(host string, basePath string, info spec.InfoProps) *YiDoc {
-	y.info = info
-	y.host = host
-	y.basePath = basePath
+// HostInfo add host info to documents
+func (y *Swaggo) HostInfo(host string, basePath string) *Swaggo {
+	y.info = spec.InfoProps{
+		Version: "2.0",
+		Title:   fmt.Sprintf("document of %s", host),
+	}
+	y.host = strings.TrimRight(host, "/")
+	y.basePath = "/" + strings.Trim(basePath, "/")
 	return y
 }
 
-func (y *YiDoc) Build() ([]byte, error) {
+// Produces create global produces header
+func (y *Swaggo) Produces(s ...string) {
+	y.produces = append(y.produces, s...)
+}
+
+// Consumes create global consumes header
+func (y *Swaggo) Consumes(s ...string) {
+	y.consumes = append(y.consumes, s...)
+}
+
+// Build return json schema of swagger doc
+func (y *Swaggo) Build() ([]byte, error) {
 	swag := spec.Swagger{
 		SwaggerProps: spec.SwaggerProps{
-			Consumes:            []string{applicationJson},
-			Produces:            []string{applicationJson},
+			Consumes:            y.consumes,
+			Produces:            y.produces,
 			Swagger:             "2.0",
 			Info:                &spec.Info{InfoProps: y.info},
 			Host:                y.host,
@@ -126,23 +170,24 @@ func (y *YiDoc) Build() ([]byte, error) {
 			SecurityDefinitions: y.securityDefinitions,
 			Security:            y.security,
 			Parameters:          y.params,
+			Schemes:             y.schemas,
 		},
 	}
-	data, err := json.MarshalIndent(swag, "", " ")
+	data, err := json.Marshal(swag)
 	if err != nil {
 		return nil, err
 	}
 	return data, nil
 }
 
-func (y *YiDoc) buildPaths() *spec.Paths {
+func (y *Swaggo) buildPaths() *spec.Paths {
 	paths := &spec.Paths{Paths: map[string]spec.PathItem{}}
 	for path, items := range y.paths {
+		pi := spec.PathItem{
+			PathItemProps: spec.PathItemProps{},
+		}
 		for method, item := range items {
 			var operate = item.build()
-			pi := spec.PathItem{
-				PathItemProps: spec.PathItemProps{},
-			}
 			switch method {
 			case http.MethodGet:
 				pi.Get = operate
@@ -157,7 +202,6 @@ func (y *YiDoc) buildPaths() *spec.Paths {
 			case http.MethodOptions:
 				pi.Options = operate
 			}
-
 			for name := range y.params {
 				pi.PathItemProps.Parameters = append(pi.PathItemProps.Parameters, spec.Parameter{
 					Refable: spec.Refable{
@@ -165,8 +209,8 @@ func (y *YiDoc) buildPaths() *spec.Paths {
 					},
 				})
 			}
-			paths.Paths[path] = pi
 		}
+		paths.Paths[path] = pi
 	}
 	return paths
 }

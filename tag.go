@@ -1,4 +1,4 @@
-package yidoc
+package swaggos
 
 import (
 	"github.com/go-openapi/spec"

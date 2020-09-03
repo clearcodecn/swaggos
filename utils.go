@@ -1,8 +1,9 @@
-package yidoc
+package swaggos
 
 import (
 	"github.com/go-openapi/spec"
 	"reflect"
+	"strings"
 )
 
 const (
@@ -159,4 +160,12 @@ func basicSchema(typ reflect.Type) spec.Schema {
 	default:
 		return emptyObjectSchema()
 	}
+}
+
+func pkgPath(typ reflect.Type) []string {
+	switch typ.Kind() {
+	case reflect.Slice, reflect.Array, reflect.Ptr:
+		typ = typ.Elem()
+	}
+	return strings.Split(typ.PkgPath(), "/")
 }
