@@ -1,14 +1,14 @@
 # Swaggos
 
-swaggos is a tool for build swagger docs for golang. it generates docs from native golang code. And it wraps popular web frameworks easy to use!
+swaggos 是一个golang版本的swagger文档生成器，提供了native code包装器，并且支持主流的web框架包裹器
 
-### Installation
+### 安装
 ```
     go get -u github.com/clearcodecn/swaggos
 ```
 
-### Example
-> for now it only support gin wrappers. and will support more web framework. 
+### 示例
+> 目前只支持gin的包裹器
 ```
 package main
 
@@ -61,140 +61,147 @@ func createUser(ctx *gin.Context) {}
 func deleteUser(ctx *gin.Context) {}
 
 ```
-example will generate ui: [click here to see image](./images/ui.png)
+示例将会生成该图例: [click here to see image](./images/ui.png)
 
-### Usage
+### 使用
 
-#### add header
+#### 增加请求头
 ```
      doc.Header("name","description",true)
     => generate a required header with key name
 ```
 
-#### add jwt 
+#### 增加jwt token
 ```
     doc.JWT("Authorization")
     => ui will create authorization in request headers.  
 ```
 
-#### Oauth2
+#### Oauth2 支持
 ```
     scopes:= []string{"openid"}
     doc.Oauth2("http://path/to/oauth/token/url",scopes,scopes)
     => ui will create a oauth2 password credentials client
 ```
 
-### add HostInfo
+### 增加 host 信息
 ```
     doc.HostInfo("yourhost.com","/your/api/prefix")
 ```
 
-### add Produces
+### 增加 响应 content-Type 类型
 ```
     doc.Produces("application/json")
 ```
 
-### add Consumes
+### 增加 请求 content-Type 类型
 ```
     doc.Consumes("application/json")
 ```
 
-### Build to json
+### 生成json
 ```
     data,_ := doc.Build()
     fmt.Println(string(data))
     => this is the swagger schema in json format
 ```
 
-## Object Rules
- swaggos will parse object tag to create swagger rules.follow options are supported:
+## struct的规则
+   swaggos 会解析结构体的tag并将其赋值到 swagger 规则上面，下面是本项目支持的一些tag示例
 
 ```
     type User struct {
-        // Model for field name
+        // 字段名称  model > json
         // this example field name will be m1
         ModelName string `model:"m1" json:"m2"`
-        // field name will be username
+        // 字段名会是  username 
         Username string `json:"username"` 
-        //  field name will be Password
+        //  字段名会是 Password
         Password string 
-        //  will be ignore
+        // 会被忽略
         Ignored `json:"-"`
-        //  true will be required field, false or empty will be not required
+        // 是否必须
         Required string `required:"true"`
-        // create description
+        // 字段的描述
         Description string `description:"this is description"`
-        // a time type
+        // 字段的类型: string,integer,time,number,boolean,array...
         Type string `type:"time"`
-        // default is abc
+        // 默认值 abc
         DefaultValue string `default:"abc"`
-        // max value is: 100
+        // 最大值 100
         Max float64 `maximum:"100"`
-        // min value is: 0
+        // 最小值 0
         Min float64 `min:"0"`
-        // MaxLength is 20
+        // 最大长度 20
         MaxLength string `maxLength:"20"`
-        // MinLength is 10
+        // 最小长度 10
         MinLength string `minLength:"10"`
-        // Pattern for regexp rules
+        // 正则表达式规则
         Pattern string `pattern:"\d{0,9}"`
-        // array.length must <= 3
+        // 数组长度 小于3
         MaxItems []int `MaxItems:"3"`
-        // array.length must >= 3
+        // 数组长度大于3
         MinItem []int `MinItems:"3"`
-        // Enum values
+        // 枚举，用 , 分割
         EnumValue int `enum:"a,b,c,d"`
-        // ignore
+        // 忽略字段
         IgnoreField string `ignore:"true"`
+        // 匿名字段规则：
+        // 如果是一个基本类型，则直接添加, 
+        // 如果是一个 数组，也将直接添加
+        // 如果是一个结构体 但是带了json tag，将会作为一个字段
+        // 如果是一个结构体 带没有json tag，将会将里面的子字段添加上该结构体上
+        Anymouse
     }
 ```
  
  
-## Utils functions in path item
+## path上的工具方法
 ```
     path := doc.Get("/")
-    // create a query field with description and required
+    // 创建一个 query 字段，包含了 描述和是否必须
     path.Query("name",DescRequired("description",true)).
-        // create a field with description and required and default value
-        Query("name2",DescRequiredDefault("desc",true,"default"))
+    // 创建一个 query 字段，包含了 描述和是否必须 和默认值
+    Query("name2",DescRequiredDefault("desc",true,"default"))
 ```
 
 other useful functions:
 
 ``` 
-    // create a groups for user like '/users' prefix
+    // 创建一个 swagger 的tag
     path.Tag("user group")
     
-    // simple description for a api
+    // 请求的简单描述
     path.Summary("create a new user")
 
-    // description for api
+    // 请求的详细描述
     path.Description("....")
        
-    // set content-type
+    // 设置请求-响应头
     path.ContentType("application/json","text/html")
    
-    // form values 
+    // form 字段
     path.Form("key1",swaggos.Attribute{Required:true})
 
-    // form files
+    // 文件
     path.FormFile("file",swaggos.Attribute{Required:true})
     
-    // form object reference
+    // form 用接头体解析
     path.FormObject(new(User))
 
-    // query object
+    // query 用结构体解析
     path.QueryObject(new(User))
     
-    // body
+    // body 用结构体解析
     path.Body(new(User))
-    // json response
+
+    // 响应json
     path.JSON(new(User))
 ```
 
-## create response
+## 响应
 ```
-    // will provide a example response
+    // 响应带上具体的内容，将会创建具体的json示例
     // 400 
     path.BadRequest(map[string]interface{
             "data": nil,
@@ -208,5 +215,6 @@ other useful functions:
     path.ServerError(v)
 ```
 
-## Contact Me
+
+## 联系我
 ![wechat](./images/wechat.png) 
