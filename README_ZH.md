@@ -62,6 +62,7 @@ func deleteUser(ctx *gin.Context) {}
 
 ```
 示例将会生成该图例: [click here to see image](./images/ui.png)
+您可以查看 examples 目录查看更多示例.
 
 ### 使用
 
@@ -104,6 +105,10 @@ func deleteUser(ctx *gin.Context) {}
     data,_ := doc.Build()
     fmt.Println(string(data))
     => this is the swagger schema in json format
+
+    data,_ := doc.Yaml()
+    fmt.Println(string(data))
+    => yaml format
 ```
 
 ## struct的规则
@@ -139,9 +144,9 @@ func deleteUser(ctx *gin.Context) {}
         // 正则表达式规则
         Pattern string `pattern:"\d{0,9}"`
         // 数组长度 小于3
-        MaxItems []int `MaxItems:"3"`
+        MaxItems []int `maxItems:"3"`
         // 数组长度大于3
-        MinItem []int `MinItems:"3"`
+        MinItem []int `minItems:"3"`
         // 枚举，用 , 分割
         EnumValue int `enum:"a,b,c,d"`
         // 忽略字段

@@ -9,7 +9,7 @@ import (
 // Define defines a object or a array to swagger definitions area.
 // it will find all sub-items and build them into swagger tree.
 // it returns the definitions ref.
-func (y *Swaggo) Define(v interface{}) spec.Ref {
+func (y *Swaggos) Define(v interface{}) spec.Ref {
 	schema := y.buildSchema(v)
 	return y.addDefinition(v, schema)
 }
@@ -17,7 +17,7 @@ func (y *Swaggo) Define(v interface{}) spec.Ref {
 // addDefinition add a definition to swagger definitions.
 // the name will get from the given type.
 // if name's name is repeated, will add package path prefix to the name until name is unique.
-func (y *Swaggo) addDefinition(t interface{}, v spec.Schema) spec.Ref {
+func (y *Swaggos) addDefinition(t interface{}, v spec.Schema) spec.Ref {
 	var (
 		name string
 		typ  reflect.Type
@@ -66,7 +66,7 @@ func (y *Swaggo) addDefinition(t interface{}, v spec.Schema) spec.Ref {
 	return definitionRef(name)
 }
 
-func (y *Swaggo) buildSchema(v interface{}) spec.Schema {
+func (y *Swaggos) buildSchema(v interface{}) spec.Schema {
 	typ := reflect.TypeOf(v)
 	// if given nil interface{}, typ is nil, then we return a empty object schema
 	if typ == nil {
@@ -121,7 +121,7 @@ func (y *Swaggo) buildSchema(v interface{}) spec.Schema {
 }
 
 // val is struct value
-func (y *Swaggo) buildStructSchema(v interface{}) spec.Schema {
+func (y *Swaggos) buildStructSchema(v interface{}) spec.Schema {
 	typ := reflect.TypeOf(v)
 	val := reflect.ValueOf(v)
 	// if given nil interface{}, typ is nil, then we return a empty object schema
@@ -182,4 +182,25 @@ func (y *Swaggo) buildStructSchema(v interface{}) spec.Schema {
 		schema.Properties[fieldName] = prop
 	}
 	return schema
+}
+
+func (y *Swaggos) Response(status int, v interface{}) *Swaggos {
+	ref := y.Define(v)
+	if y.response == nil {
+		y.response = make(map[int]spec.Response)
+	}
+	y.response[status] = spec.Response{
+		ResponseProps: spec.ResponseProps{
+			Description: "json response",
+			Schema: &spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Ref: ref,
+				},
+			},
+			Examples: map[string]interface{}{
+				applicationJson: v,
+			},
+		},
+	}
+	return y
 }

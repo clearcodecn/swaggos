@@ -63,5 +63,6 @@ func (t *documentTag) mergeSchema(schema spec.Schema) spec.Schema {
 	schema.MaxItems = t.attribute.MaxItems
 	schema.MinItems = t.attribute.MinItems
 	schema.Enum = t.attribute.Enum
+	schema.Default = t.attribute.Default
 	return schema
 }

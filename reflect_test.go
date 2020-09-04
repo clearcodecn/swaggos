@@ -56,7 +56,7 @@ type ExampleObject struct {
 }
 
 func TestYiDoc(t *testing.T) {
-	yd := new(Swaggo)
+	yd := new(Swaggos)
 	yd.Define(new(A))
 
 	def, err := json.MarshalIndent(yd.definitions, "", "  ")

@@ -40,7 +40,9 @@ func (a *Attribute) parseTag(t reflect.StructTag) {
 	a.Nullable = t.Get("nullable") == "true"
 	a.Format = t.Get("format")
 	a.Title = t.Get("title")
-	a.Default = t.Get("default")
+	if _, ok := t.Lookup("default"); ok {
+		a.Default = t.Get("default")
+	}
 	a.Maximum = str2f64Ptr(t.Get("maximum"))
 	a.Minimum = str2f64Ptr(t.Get("minimum"))
 	a.MaxLength = str2i64Ptr(t.Get("maxLength"))
@@ -64,6 +66,9 @@ func (a *Attribute) parseTag(t reflect.StructTag) {
 		a.Json = strings.Split(j, ",")[0]
 	}
 	if a.Json == "-" || a.Model == "-" {
+		a.Ignore = true
+	}
+	if ignore := t.Get("ignore"); ignore == "true" {
 		a.Ignore = true
 	}
 }

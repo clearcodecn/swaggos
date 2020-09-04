@@ -9,7 +9,7 @@ import (
 
 type Engine struct {
 	engine *gin.Engine
-	doc    *swaggos.Swaggo
+	doc    *swaggos.Swaggos
 }
 
 func Default() *Engine {
@@ -29,7 +29,7 @@ func New(g *gin.Engine) *Engine {
 	return e
 }
 
-func (e *Engine) Doc() *swaggos.Swaggo {
+func (e *Engine) Doc() *swaggos.Swaggos {
 	return e.doc
 }
 
@@ -91,12 +91,7 @@ func (e *Engine) ServeDoc() {
 }
 
 func trimPath(path string) string {
-	if len(path) == 0 {
-		path = "/"
-	}
-	if path[0] != '/' {
-		path = "/" + path
-	}
+	path = "/" + strings.Trim(path, "/")
 	arr := strings.Split(path, "/")
 	var pathArr []string
 	for _, a := range arr {
