@@ -9,7 +9,7 @@ swaggos 是一个golang版本的swagger文档生成器，提供了native code包
 
 ### 示例
 > 目前只支持gin的包裹器
-```
+```go
 package main
 
 import (
@@ -63,6 +63,32 @@ func deleteUser(ctx *gin.Context) {}
 ```
 示例将会生成该图例: [click here to see image](./images/ui.png)
 您可以查看 examples 目录查看更多示例.
+
+### 您也可以不使用包裹器
+```go
+func main() {
+	doc := swaggos.Default()
+
+	doc.HostInfo("localhost:8080", "/api").
+		Response(200, newSuccessExample()).
+		Response(400, newErrorExample())
+
+	group := doc.Group("/users")
+	group.Get("/list").JSON(CommonResponseWithData([]model.User{}))
+	group.Post("/create").Body(new(model.User)).JSON(CommonResponseWithData(1))
+	group.Put("/update").Body(new(model.User)).JSON(CommonResponseWithData(1))
+	// path item
+	group.Get("/{id}").JSON(new(model.User))
+	group.Delete("/{id}").JSON(CommonResponseWithData(1))
+
+	data, _ := doc.Build()
+	fmt.Println(string(data))
+
+	data, _ = doc.Yaml()
+	fmt.Println(string(data))
+}
+
+```
 
 ### 使用
 

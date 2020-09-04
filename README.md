@@ -64,6 +64,32 @@ func deleteUser(ctx *gin.Context) {}
 example will generate ui: [click here to see image](./images/ui.png)
 for more examples you can checkout [examples](./examples/Readme.md)
 
+- you can use groups directly. 
+```go
+func main() {
+	doc := swaggos.Default()
+
+	doc.HostInfo("localhost:8080", "/api").
+		Response(200, newSuccessExample()).
+		Response(400, newErrorExample())
+
+	group := doc.Group("/users")
+	group.Get("/list").JSON(CommonResponseWithData([]model.User{}))
+	group.Post("/create").Body(new(model.User)).JSON(CommonResponseWithData(1))
+	group.Put("/update").Body(new(model.User)).JSON(CommonResponseWithData(1))
+	// path item
+	group.Get("/{id}").JSON(new(model.User))
+	group.Delete("/{id}").JSON(CommonResponseWithData(1))
+
+	data, _ := doc.Build()
+	fmt.Println(string(data))
+
+	data, _ = doc.Yaml()
+	fmt.Println(string(data))
+}
+
+```
+
 ### Usage
 
 #### add header
