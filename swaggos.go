@@ -33,6 +33,7 @@ func NewSwaggo(option ...Option) *Swaggos {
 	doc := new(Swaggos)
 	doc.definitions = make(spec.Definitions)
 	doc.paths = make(map[string]map[string]*Path)
+	doc.params = make(map[string]spec.Parameter)
 	for _, o := range option {
 		o(doc)
 	}
@@ -87,21 +88,21 @@ func (y *Swaggos) JWT(keyName string) *Swaggos {
 			In:          "header",
 		},
 	}
-	y.addAuth(keyName, &def, nil)
+	y.addAuth(keyName, &def, map[string][]string{
+		keyName: []string{},
+	})
 	return y
 }
 
-// Oauth2 create a oauth2 header
-func (y *Swaggos) Oauth2(tokenURL string, scopes []string, permits []string) *Swaggos {
-	oauth2 := spec.OAuth2Password(tokenURL)
-	if len(scopes) == 0 {
-		scopes = []string{"openid"}
+func (y *Swaggos) Basic() *Swaggos {
+	def := spec.SecurityScheme{
+		SecuritySchemeProps: spec.SecuritySchemeProps{
+			Description: "basic auth",
+			Type:        "basic",
+		},
 	}
-	for _, scope := range scopes {
-		oauth2.AddScope(scope, "")
-	}
-	y.addAuth("Oauth2", oauth2, map[string][]string{
-		"Oauth2": permits,
+	y.addAuth(`basicAuth`, &def, map[string][]string{
+		`basicAuth`: []string{},
 	})
 	return y
 }
@@ -115,6 +116,9 @@ func (y *Swaggos) Header(name string, desc string, required bool) {
 		panic(fmt.Errorf("repeated header param: %s", name))
 	}
 	param := spec.Parameter{
+		SimpleSchema: spec.SimpleSchema{
+			Type: String,
+		},
 		ParamProps: spec.ParamProps{
 			Description: desc,
 			Name:        name,
@@ -125,7 +129,7 @@ func (y *Swaggos) Header(name string, desc string, required bool) {
 	y.params[name] = param
 }
 
-func (y *Swaggos) addAuth(key string, schema *spec.SecurityScheme, security map[string][]string) {
+func (y *Swaggos) addAuth(key string, schema *spec.SecurityScheme, security map[string][]string) *Swaggos {
 	if y.securityDefinitions == nil {
 		y.securityDefinitions = make(map[string]*spec.SecurityScheme)
 	}
@@ -137,6 +141,7 @@ func (y *Swaggos) addAuth(key string, schema *spec.SecurityScheme, security map[
 		security = make(map[string][]string)
 	}
 	y.security = append(y.security, security)
+	return y
 }
 
 // HostInfo add host info to documents
@@ -244,4 +249,53 @@ func (y *Swaggos) Extend(url string, desc string) {
 		Description: desc,
 		URL:         url,
 	}
+}
+
+// Query add query param to the group
+func (y *Swaggos) Query(name string, desc string, required bool) *Swaggos {
+	param := spec.Parameter{
+		SimpleSchema: spec.SimpleSchema{
+			Type: String,
+		},
+		ParamProps: spec.ParamProps{
+			Description: desc,
+			Name:        name,
+			In:          InQuery,
+			Required:    required,
+		},
+	}
+	y.params[name] = param
+	return y
+}
+
+// Form add form param to the group
+func (y *Swaggos) Form(name string, desc string, required bool) *Swaggos {
+	param := spec.Parameter{
+		SimpleSchema: spec.SimpleSchema{
+			Type: String,
+		},
+		ParamProps: spec.ParamProps{
+			Description: desc,
+			Name:        name,
+			In:          InForm,
+			Required:    required,
+		},
+	}
+	y.params[name] = param
+	return y
+}
+
+func (y *Swaggos) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	var data []byte
+	format := r.URL.Query().Get("format")
+	var contentType = "application/json"
+	switch format {
+	case "yaml":
+		data, _ = y.Yaml()
+		contentType = "application/yaml"
+	default:
+		data, _ = y.Build()
+	}
+	w.Header().Set("Content-Type", contentType)
+	w.Write(data)
 }

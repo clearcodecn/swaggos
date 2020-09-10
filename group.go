@@ -22,8 +22,11 @@ func NewGroup(prefix string, swaggos *Swaggos) *Group {
 }
 
 // Header defines a header param
-func (g *Group) Header(name string, desc string, required bool) {
+func (g *Group) Header(name string, desc string, required bool) *Group {
 	param := spec.Parameter{
+		SimpleSchema: spec.SimpleSchema{
+			Type: String,
+		},
 		ParamProps: spec.ParamProps{
 			Description: desc,
 			Name:        name,
@@ -32,6 +35,41 @@ func (g *Group) Header(name string, desc string, required bool) {
 		},
 	}
 	g.params = append(g.params, param)
+	return g
+}
+
+// Query add query param to the group
+func (g *Group) Query(name string, desc string, required bool) *Group {
+	param := spec.Parameter{
+		SimpleSchema: spec.SimpleSchema{
+			Type: String,
+		},
+		ParamProps: spec.ParamProps{
+			Description: desc,
+			Name:        name,
+			In:          InQuery,
+			Required:    required,
+		},
+	}
+	g.params = append(g.params, param)
+	return g
+}
+
+// Form add form param to the group
+func (g *Group) Form(name string, desc string, required bool) *Group {
+	param := spec.Parameter{
+		SimpleSchema: spec.SimpleSchema{
+			Type: String,
+		},
+		ParamProps: spec.ParamProps{
+			Description: desc,
+			Name:        name,
+			In:          InForm,
+			Required:    required,
+		},
+	}
+	g.params = append(g.params, param)
+	return g
 }
 
 // Get create a path with group's prefix and given path of Get method

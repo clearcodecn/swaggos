@@ -1,118 +1,154 @@
 # Swaggos
 
-swaggos 是一个golang版本的swagger文档生成器，提供了native code包装器，并且支持主流的web框架包裹器
+swaggos 是一个golang版本的swagger文档生成器，提供了native code包装器. 
 
-### 安装
+## 安装
 ```
     go get -u github.com/clearcodecn/swaggos
 ```
 
-### 示例
-> 目前只支持gin的包裹器
-```
-package main
+## 使用
 
-import (
-	"github.com/clearcodecn/swaggos"
-	"github.com/clearcodecn/swaggos/ginwrapper"
-	"github.com/gin-gonic/gin"
-	"github.com/go-openapi/spec"
-)
-
-type User struct {
-	Username     string `json:"username" required:"true"`
-	Password     string `json:"password" required:"true" description:"密码" example:"123456" maxLength:"20" minLength:"6" pattern:"[a-zA-Z0-9]{6,20}"`
-	Sex          int    `json:"sex" required:"false" default:"1" example:"1" format:"int64"`
-	HeadImageURL string `json:"headImageUrl"`
-
-	History string `json:"-"` // ignore
-}
-
-func main() {
-	g := ginwrapper.Default()
-	doc := g.Doc()
-	g.Gin().Use(func(ctx *gin.Context) {
-		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-	})
-	doc.JWT("Authorization")
-	doc.HostInfo("https://localhost:8080/", "/api/v1")
-	group := g.Group("/api/v1")
-	{
-		group.GET("/users", listUsers).
-			Query("order", swaggos.DescRequired("排序", false)).
-			Query("q", swaggos.DescRequired("名称迷糊查询", false)).
-			JSON([]User{})
-
-		group.POST("/user/create", createUser).
-			Body(new(User)).JSON(gin.H{"id": 1})
-
-		group.DELETE("/user/*id", deleteUser).
-			JSON(gin.H{"id": 1})
-
-		group.PUT("/user/update", createUser).
-			Body(new(User)).JSON(new(User))
-	}
-	g.ServeDoc()
-	g.Gin().Run(":8888")
-}
-
-func listUsers(ctx *gin.Context)  {}
-func createUser(ctx *gin.Context) {}
-func deleteUser(ctx *gin.Context) {}
-
-```
-示例将会生成该图例: [click here to see image](./images/ui.png)
-您可以查看 examples 目录查看更多示例.
-
-### 使用
-
-#### 增加请求头
-```
-     doc.Header("name","description",true)
-    => generate a required header with key name
-```
-
-#### 增加jwt token
-```
-    doc.JWT("Authorization")
-    => ui will create authorization in request headers.  
-```
-
-#### Oauth2 支持
-```
-    scopes:= []string{"openid"}
-    doc.Oauth2("http://path/to/oauth/token/url",scopes,scopes)
-    => ui will create a oauth2 password credentials client
-```
-
-### 增加 host 信息
-```
-    doc.HostInfo("yourhost.com","/your/api/prefix")
-```
-
-### 增加 响应 content-Type 类型
-```
+### 创建实例
+> 创建一个新的实例，配置一些基本信息 `host` 和 `apiPrefix` 
+``` 
+    doc := swaggos.Default()
+    doc.HostInfo("www.github.com","/api/v1")
+    
+    // default is application/json
     doc.Produces("application/json")
-```
-
-### 增加 请求 content-Type 类型
-```
+    
+    // default is application/json
     doc.Consumes("application/json")
 ```
 
-### 生成json
+### Authorization
+项目支持swagger的所有鉴权方式：`oauth2`, `basic auth`, `apiKey` 
+#### Oauth2
 ```
-    data,_ := doc.Build()
-    fmt.Println(string(data))
-    => this is the swagger schema in json format
+    var scopes = []string{"openid"}
+    var tokenURL = "https://yourtokenurl"
+    var authURL = "https://yourAuthURL"
 
-    data,_ := doc.Yaml()
-    fmt.Println(string(data))
-    => yaml format
+    // config password flow
+    doc.Oauth2Password(tokenURL,scopes)
+    // access code
+    doc.Oauth2AccessCode(authURL,tokenURL,scopes)
+    // client 
+    doc.Oauth2Client(tokenURL,scopes)
+    // implicit
+    doc.Oauth2Implicit(authURL,scopes)
+```
+#### Basic Auth
+```
+    doc.Basic()
+```
+#### 自定义Token
+> 会在header中增加`access_token`参数
+```
+    doc.JWT("access_token")
 ```
 
-## struct的规则
-   swaggos 会解析结构体的tag并将其赋值到 swagger 规则上面，下面是本项目支持的一些tag示例
+### 公共参数
+```
+    // will create header param in each request
+    doc.Header("name","description",true)
+    doc.Query("name","description",true)
+    doc.Form("name","description",true)
+```
+
+### 请求路劲
+> path 是一个请求的实例，支持流式写法. 
+```
+    // 创建一个 path
+    path := doc.Get("user_information")
+    
+    path.
+        Tag("tagName"). // 创建 tag 
+        Summary("summary"). // 总结
+        Description("...."). // 描述
+        ContentType("application/json","text/html"). // 请求/响应类型
+
+    // path params 
+    path.Form("key",swaggos.Attribute{})
+  
+    // form files
+    path.FormFile("file",swaggos.Attribute{Required:true})
+    
+    // form object reference
+    path.FormObject(new(User))
+
+    // query object
+    path.QueryObject(new(User))
+    
+    // body
+    path.Body(new(User))
+    // json response
+    path.JSON(new(User))
+
+    // Attribute rules: 
+    type Attribute struct {
+    	Model       string      `json:"model"`          // key name
+    	Description string      `json:"description"`    // description 
+    	Required    bool        `json:"required"`       // if it's required 
+    	Type        string      `json:"type"`           // the param type
+    	Example     interface{} `json:"example"`        // example value
+    
+    	Nullable  bool          `json:"nullable,omitempty"`     // if it's nullable
+    	Format    string        `json:"format,omitempty"`       // format 
+    	Title     string        `json:"title,omitempty"`        // title 
+    	Default   interface{}   `json:"default,omitempty"`      // default value
+    	Maximum   *float64      `json:"maximum,omitempty"`       // max num
+    	Minimum   *float64      `json:"minimum,omitempty"`       // min num
+    	MaxLength *int64        `json:"maxLength,omitempty"`    // max length
+    	MinLength *int64        `json:"minLength,omitempty"`    // min length
+    	Pattern   string        `json:"pattern,omitempty"`      // regexp pattern
+    	MaxItems  *int64        `json:"maxItems,omitempty"`     // max array length
+    	MinItems  *int64        `json:"minItems,omitempty"`     // min array length
+    	Enum      []interface{} `json:"enum,omitempty"`         // enum values
+    	Ignore    bool          `json:"ignore"`                 // if it's ignore
+    	Json      string        `json:"json"`                   // key name
+    }
+```
+
+### 路劲响应
+```
+    // 响应json，创建model
+    path.JSON(new(Response))
+    // will provide a example response
+    // 400 
+    path.BadRequest(map[string]interface{
+            "data": nil,
+            "code": 400,
+    })
+    // 401
+    path.UnAuthorization(v)
+    // 403
+    path.Forbidden(v)
+    // 500 
+    path.ServerError(v)
+```
+
+### 分组
+> 分组将对api进行分组，组下面的所有路劲会共享分组的公共参数
+```
+    	g := doc.Group("/api/v2")
+    	g.Get("/user") // --> /api/v2/user
+        // ... other methods
+        g.Form ...
+        g.Query ...
+        g.Header ...
+```
+
+### 全局响应
+```
+    doc.Response(200, new(Success))
+    doc.Response(400, new(Fail))
+    doc.Response(500, new(ServerError))
+```
+
+### 结构体的tag支持
+ 
 
 ```
     type User struct {
@@ -156,70 +192,30 @@ func deleteUser(ctx *gin.Context) {}
         // 如果是一个 数组，也将直接添加
         // 如果是一个结构体 但是带了json tag，将会作为一个字段
         // 如果是一个结构体 带没有json tag，将会将里面的子字段添加上该结构体上
-        Anymouse
+        Anonymous
     }
 ```
  
- 
-## path上的工具方法
+
+### 构建json和yaml
 ```
-    path := doc.Get("/")
-    // 创建一个 query 字段，包含了 描述和是否必须
-    path.Query("name",DescRequired("description",true)).
-    // 创建一个 query 字段，包含了 描述和是否必须 和默认值
-    Query("name2",DescRequiredDefault("desc",true,"default"))
-```
+    data,_ := doc.Build()
+    fmt.Println(string(data))
+    => this is the swagger schema in json format
 
-other useful functions:
-
-``` 
-    // 创建一个 swagger 的tag
-    path.Tag("user group")
-    
-    // 请求的简单描述
-    path.Summary("create a new user")
-
-    // 请求的详细描述
-    path.Description("....")
-       
-    // 设置请求-响应头
-    path.ContentType("application/json","text/html")
-   
-    // form 字段
-    path.Form("key1",swaggos.Attribute{Required:true})
-
-    // 文件
-    path.FormFile("file",swaggos.Attribute{Required:true})
-    
-    // form 用接头体解析
-    path.FormObject(new(User))
-
-    // query 用结构体解析
-    path.QueryObject(new(User))
-    
-    // body 用结构体解析
-    path.Body(new(User))
-
-    // 响应json
-    path.JSON(new(User))
+    data,_ := doc.Yaml()
+    fmt.Println(string(data))
+    => yaml format
 ```
 
-## 响应
+### 提供 http 服务
 ```
-    // 响应带上具体的内容，将会创建具体的json示例
-    // 400 
-    path.BadRequest(map[string]interface{
-            "data": nil,
-            "code": 400,
-    })
-    // 401
-    path.UnAuthorization(v)
-    // 403
-    path.Forbidden(v)
-    // 500 
-    path.ServerError(v)
+    http.Handle("/swagger",doc)
 ```
 
+> Tips: examples 目录下面有少量的示例
 
-## 联系我
+
+## Contact Me
+QQ群: 642154119 
 ![wechat](./images/wechat.png) 

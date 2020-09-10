@@ -3,7 +3,6 @@ package swaggos
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/clearcodecn/swaggos/examples/pkg"
 	"github.com/stretchr/testify/require"
 	"net/http"
 	"testing"
@@ -66,7 +65,7 @@ func TestYiDoc(t *testing.T) {
 func TestDocs(t *testing.T) {
 	d := NewSwaggo()
 	d.JWT("Token").
-		Oauth2("https://www.oauth2.com/token", []string{"openid"}, []string{"read", "write"}).
+		Oauth2Password("https://www.oauth2.com/token", []string{"openid"}).
 		HostInfo("localhost:8899", "/api/v1")
 
 	d.Get("/{id}").Query("orderBy", Attribute{
@@ -106,47 +105,4 @@ func TestBuildSchema(t *testing.T) {
 	y.Define(v)
 	data, _ := y.Build()
 	fmt.Println(string(data))
-}
-
-type UserX struct {
-	Username string
-	Password string
-}
-
-func TestDocs2(t *testing.T) {
-	d := NewSwaggo()
-	d.JWT("Token").
-		Oauth2("https://www.oauth2.com/token", []string{"openid"}, []string{"read", "write"}).
-		HostInfo("localhost:8899", "/api/v1")
-
-	d.Get("/{id}").Query("orderBy", Attribute{
-		Description: "排序",
-		Required:    false,
-		Type:        "string",
-		Format:      "string",
-	}).
-		Description("排序的用户").
-		Tag("orders").
-		Summary("排序").
-		JSON([]UserX{})
-
-	d.Delete("/{id}").Query("orderBy", Attribute{
-		Description: "排序",
-		Required:    false,
-		Type:        "string",
-		Format:      "string",
-	}).
-		JSON([]pkg.UserX{})
-
-	d.Post("/{id}").Body([]pkg.UserX{}).
-		JSON([]pkg.UserX{})
-
-	data, err := d.Build()
-	fmt.Println(string(data))
-	require.Nil(t, err)
-	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
-		writer.Header().Set("Access-Control-Allow-Origin", "*")
-		writer.Write(data)
-	})
-	http.ListenAndServe(":9991", nil)
 }

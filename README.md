@@ -1,117 +1,157 @@
 # Swaggos
 
-swaggos is a tool for build swagger docs for golang. it generates docs from native golang code. And it wraps popular web frameworks easy to use!
+swaggos is a tool for build swagger docs for golang. it generates docs from native golang code. 
 
-### Installation
+## Installation
 ```
     go get -u github.com/clearcodecn/swaggos
 ```
 
-### Example
-> for now it only support gin wrappers. and will support more web framework. 
-```
-package main
+## Usage
 
-import (
-	"github.com/clearcodecn/swaggos"
-	"github.com/clearcodecn/swaggos/ginwrapper"
-	"github.com/gin-gonic/gin"
-	"github.com/go-openapi/spec"
-)
-
-type User struct {
-	Username     string `json:"username" required:"true"`
-	Password     string `json:"password" required:"true" description:"密码" example:"123456" maxLength:"20" minLength:"6" pattern:"[a-zA-Z0-9]{6,20}"`
-	Sex          int    `json:"sex" required:"false" default:"1" example:"1" format:"int64"`
-	HeadImageURL string `json:"headImageUrl"`
-
-	History string `json:"-"` // ignore
-}
-
-func main() {
-	g := ginwrapper.Default()
-	doc := g.Doc()
-	g.Gin().Use(func(ctx *gin.Context) {
-		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-	})
-	doc.JWT("Authorization")
-	doc.HostInfo("https://localhost:8080/", "/api/v1")
-	group := g.Group("/api/v1")
-	{
-		group.GET("/users", listUsers).
-			Query("order", swaggos.DescRequired("排序", false)).
-			Query("q", swaggos.DescRequired("名称迷糊查询", false)).
-			JSON([]User{})
-
-		group.POST("/user/create", createUser).
-			Body(new(User)).JSON(gin.H{"id": 1})
-
-		group.DELETE("/user/*id", deleteUser).
-			JSON(gin.H{"id": 1})
-
-		group.PUT("/user/update", createUser).
-			Body(new(User)).JSON(new(User))
-	}
-	g.ServeDoc()
-	g.Gin().Run(":8888")
-}
-
-func listUsers(ctx *gin.Context)  {}
-func createUser(ctx *gin.Context) {}
-func deleteUser(ctx *gin.Context) {}
-
-```
-example will generate ui: [click here to see image](./images/ui.png)
-for more examples you can checkout [examples](./examples/Readme.md)
-
-### Usage
-
-#### add header
-```
-     doc.Header("name","description",true)
-    => generate a required header with key name
-```
-
-#### add jwt 
-```
-    doc.JWT("Authorization")
-    => ui will create authorization in request headers.  
-```
-
-#### Oauth2
-```
-    scopes:= []string{"openid"}
-    doc.Oauth2("http://path/to/oauth/token/url",scopes,scopes)
-    => ui will create a oauth2 password credentials client
-```
-
-### add HostInfo
-```
-    doc.HostInfo("yourhost.com","/your/api/prefix")
-```
-
-### add Produces
-```
+### New instance
+basic config set host name and api prefix
+``` 
+    doc := swaggos.Default()
+    doc.HostInfo("www.github.com","/api/v1")
+    
+    // default is application/json
     doc.Produces("application/json")
-```
-
-### add Consumes
-```
+    
+    // default is application/json
     doc.Consumes("application/json")
 ```
 
-### Build
+### Authorization
+swagger support `oauth2`, `basic auth`, `apiKey` and this project is full implement.
+#### Oauth2
 ```
-    data,_ := doc.Build()
-    fmt.Println(string(data))
-    => this is the swagger schema in json format
+    var scopes = []string{"openid"}
+    var tokenURL = "https://yourtokenurl"
+    var authURL = "https://yourAuthURL"
 
-    data,_ := doc.Yaml()
-    fmt.Println(string(data))
-    => yaml format
+    // config password flow
+    doc.Oauth2Password(tokenURL,scopes)
+    // access code
+    doc.Oauth2AccessCode(authURL,tokenURL,scopes)
+    // client 
+    doc.Oauth2Client(tokenURL,scopes)
+    // implicit
+    doc.Oauth2Implicit(authURL,scopes)
+```
+#### Basic Auth
+```
+    doc.Basic()
+```
+#### Custom token
+```
+    // will create header param
+    // access_token: your token
+    doc.JWT("access_token")
 ```
 
-## Object Rules
+### Common Params 
+```
+    // will create header param in each request
+    doc.Header("name","description",true)
+    doc.Query("name","description",true)
+    doc.Form("name","description",true)
+```
+
+### Paths
+you can change every thing in path. 
+
+> Tips: It's better to create struct for every params. 
+
+```
+    path := doc.Get("user_information")
+    // now you can access path apis
+    
+    path.
+        Tag("tagName"). // create a tag 
+        Summary("summary"). // summary the request
+        Description("...."). // create description
+        ContentType("application/json","text/html"). // set content type
+
+    // path params 
+    path.Form("key",swaggos.Attribute{})
+  
+    // form files
+    path.FormFile("file",swaggos.Attribute{Required:true})
+    
+    // form object reference
+    path.FormObject(new(User))
+
+    // query object
+    path.QueryObject(new(User))
+    
+    // body
+    path.Body(new(User))
+    // json response
+    path.JSON(new(User))
+
+    // Attribute rules: 
+    type Attribute struct {
+    	Model       string      `json:"model"`          // key name
+    	Description string      `json:"description"`    // description 
+    	Required    bool        `json:"required"`       // if it's required 
+    	Type        string      `json:"type"`           // the param type
+    	Example     interface{} `json:"example"`        // example value
+    
+    	Nullable  bool          `json:"nullable,omitempty"`     // if it's nullable
+    	Format    string        `json:"format,omitempty"`       // format 
+    	Title     string        `json:"title,omitempty"`        // title 
+    	Default   interface{}   `json:"default,omitempty"`      // default value
+    	Maximum   *float64      `json:"maximum,omitempty"`       // max num
+    	Minimum   *float64      `json:"minimum,omitempty"`       // min num
+    	MaxLength *int64        `json:"maxLength,omitempty"`    // max length
+    	MinLength *int64        `json:"minLength,omitempty"`    // min length
+    	Pattern   string        `json:"pattern,omitempty"`      // regexp pattern
+    	MaxItems  *int64        `json:"maxItems,omitempty"`     // max array length
+    	MinItems  *int64        `json:"minItems,omitempty"`     // min array length
+    	Enum      []interface{} `json:"enum,omitempty"`         // enum values
+    	Ignore    bool          `json:"ignore"`                 // if it's ignore
+    	Json      string        `json:"json"`                   // key name
+    }
+
+
+```
+
+### Groups
+group will add the common params to each path item below the group.
+```
+    	g := doc.Group("/api/v2")
+    	g.Get("/user") // --> /api/v2/user
+        // ... other methods
+        g.Form ...
+        g.Query ...
+        g.Header ...
+```
+
+### path Response
+```
+    // will provide a example response
+    // 400 
+    path.BadRequest(map[string]interface{
+            "data": nil,
+            "code": 400,
+    })
+    // 401
+    path.UnAuthorization(v)
+    // 403
+    path.Forbidden(v)
+    // 500 
+    path.ServerError(v)
+```
+
+### Global Response
+```
+    doc.Response(200, new(Success))
+    doc.Response(400, new(Fail))
+    doc.Response(500, new(ServerError))
+```
+
+###  Object Rules
  swaggos will parse object tag to create swagger rules.follow options are supported:
 
 ```
@@ -154,64 +194,24 @@ type RuleUser struct {
 }
 ```
  
- 
-## Utils functions in path item
+
+### Build
 ```
-    path := doc.Get("/")
-    // create a query field with description and required
-    path.Query("name",DescRequired("description",true)).
-        // create a field with description and required and default value
-        Query("name2",DescRequiredDefault("desc",true,"default"))
-```
+    data,_ := doc.Build()
+    fmt.Println(string(data))
+    => this is the swagger schema in json format
 
-other useful functions:
-
-``` 
-    // create a groups for user like '/users' prefix
-    path.Tag("user group")
-    
-    // simple description for a api
-    path.Summary("create a new user")
-
-    // description for api
-    path.Description("....")
-       
-    // set content-type
-    path.ContentType("application/json","text/html")
-   
-    // form values 
-    path.Form("key1",swaggos.Attribute{Required:true})
-
-    // form files
-    path.FormFile("file",swaggos.Attribute{Required:true})
-    
-    // form object reference
-    path.FormObject(new(User))
-
-    // query object
-    path.QueryObject(new(User))
-    
-    // body
-    path.Body(new(User))
-    // json response
-    path.JSON(new(User))
+    data,_ := doc.Yaml()
+    fmt.Println(string(data))
+    => yaml format
 ```
 
-## create response
+### Serve HTTP
 ```
-    // will provide a example response
-    // 400 
-    path.BadRequest(map[string]interface{
-            "data": nil,
-            "code": 400,
-    })
-    // 401
-    path.UnAuthorization(v)
-    // 403
-    path.Forbidden(v)
-    // 500 
-    path.ServerError(v)
+    http.Handle("/swagger",doc)
 ```
+
 
 ## Contact Me
+QQ Group: 642154119 
 ![wechat](./images/wechat.png) 
