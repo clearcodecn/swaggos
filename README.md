@@ -1,6 +1,6 @@
 # Swaggos 
 
-English |[简体中文](!./README_ZH.md)
+English | [简体中文](./README_ZH.md)
 
 swaggos is a tool for build swagger docs for golang. it generates docs from native golang code. 
 
