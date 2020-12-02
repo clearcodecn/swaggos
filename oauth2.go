@@ -1,6 +1,9 @@
 package swaggos
 
-import "github.com/go-openapi/spec"
+import (
+	"fmt"
+	"github.com/go-openapi/spec"
+)
 
 // Oauth2 create a oauth2 header
 func (y *Swaggos) Oauth2Password(tokenURL string, scopes []string) *Swaggos {
@@ -22,8 +25,8 @@ func (y *Swaggos) Oauth2Implicit(authURL string, scopes []string) *Swaggos {
 func (y *Swaggos) Oauth2Client(tokURL string, scopes []string) *Swaggos {
 	return y.Oauth2Config(Oauth2Config{
 		TokenURL: tokURL,
-		Flow:             ApplicationFlow,
-		Scopes:           scopes,
+		Flow:     ApplicationFlow,
+		Scopes:   scopes,
 	})
 }
 
@@ -75,8 +78,12 @@ func (y *Swaggos) Oauth2Config(config Oauth2Config) *Swaggos {
 			panic("TokenURL or TokenURL is empty")
 		}
 		schema = spec.OAuth2Application(config.TokenURL)
+	default:
+		panic("invalid oauth2 flow")
 	}
-
+	for _, scope := range config.Scopes {
+		schema.AddScope(scope, fmt.Sprintf("scope for: %s", scope))
+	}
 	return y.addAuth("Oauth2", schema, map[string][]string{
 		"Oauth2": config.Scopes,
 	})
