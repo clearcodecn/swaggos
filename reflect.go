@@ -2,22 +2,23 @@ package swaggos
 
 import (
 	"fmt"
-	"github.com/go-openapi/spec"
 	"reflect"
+
+	"github.com/go-openapi/spec"
 )
 
 // Define defines a object or a array to swagger definitions area.
 // it will find all sub-items and build them into swagger tree.
 // it returns the definitions ref.
-func (y *Swaggos) Define(v interface{}) spec.Ref {
-	schema := y.buildSchema(v)
-	return y.addDefinition(v, schema)
+func (swaggos *Swaggos) Define(v interface{}) spec.Ref {
+	schema := swaggos.buildSchema(v)
+	return swaggos.addDefinition(v, schema)
 }
 
 // addDefinition add a definition to swagger definitions.
 // the name will get from the given type.
 // if name's name is repeated, will add package path prefix to the name until name is unique.
-func (y *Swaggos) addDefinition(t interface{}, v spec.Schema) spec.Ref {
+func (swaggos *Swaggos) addDefinition(t interface{}, v spec.Schema) spec.Ref {
 	var (
 		name string
 		typ  reflect.Type
@@ -41,10 +42,10 @@ func (y *Swaggos) addDefinition(t interface{}, v spec.Schema) spec.Ref {
 	if name == "" {
 		name = typ.Name()
 	}
-	if y.typeNames == nil {
-		y.typeNames = make(map[reflect.Type]string)
+	if swaggos.typeNames == nil {
+		swaggos.typeNames = make(map[reflect.Type]string)
 	}
-	if name, ok := y.typeNames[typ]; ok {
+	if name, ok := swaggos.typeNames[typ]; ok {
 		return definitionRef(name)
 	}
 	pkgPath := pkgPath(typ)
@@ -52,7 +53,7 @@ func (y *Swaggos) addDefinition(t interface{}, v spec.Schema) spec.Ref {
 	i := 1
 	for {
 		// create a newName. like pkgName
-		if _, ok := y.definitions[subName]; ok {
+		if _, ok := swaggos.definitions[subName]; ok {
 			prefix := pkgPath[len(pkgPath)-i]
 			subName = fmt.Sprintf("%s.%s", prefix, name)
 			i++
@@ -61,12 +62,12 @@ func (y *Swaggos) addDefinition(t interface{}, v spec.Schema) spec.Ref {
 			break
 		}
 	}
-	y.definitions[name] = v
-	y.typeNames[typ] = name
+	swaggos.definitions[name] = v
+	swaggos.typeNames[typ] = name
 	return definitionRef(name)
 }
 
-func (y *Swaggos) buildSchema(v interface{}) spec.Schema {
+func (swaggos *Swaggos) buildSchema(v interface{}) spec.Schema {
 	typ := reflect.TypeOf(v)
 	// if given nil interface{}, typ is nil, then we return a empty object schema
 	if typ == nil {
@@ -94,8 +95,8 @@ func (y *Swaggos) buildSchema(v interface{}) spec.Schema {
 
 		// structArray
 		if elTyp.Kind() == reflect.Struct {
-			schema := y.buildSchema(elVal.Interface())
-			ref := y.addDefinition(elVal, schema)
+			schema := swaggos.buildSchema(elVal.Interface())
+			ref := swaggos.addDefinition(elVal, schema)
 			return arraySchemaRef(ref)
 		}
 		var arraySchema = emptyArray()
@@ -106,13 +107,13 @@ func (y *Swaggos) buildSchema(v interface{}) spec.Schema {
 				Schema: &basic,
 			}
 		} else {
-			schema := y.buildSchema(reflect.New(childType).Elem().Interface())
-			ref := y.addDefinition(childType, schema)
+			schema := swaggos.buildSchema(reflect.New(childType).Elem().Interface())
+			ref := swaggos.addDefinition(childType, schema)
 			childSchema.Items = refArraySchema(ref)
 		}
 		return arraySchema
 	case reflect.Struct:
-		return y.buildStructSchema(v)
+		return swaggos.buildStructSchema(v)
 	case reflect.Map, reflect.Interface:
 		// TODO:: handle map schema
 		return emptyObjectSchema()
@@ -121,7 +122,7 @@ func (y *Swaggos) buildSchema(v interface{}) spec.Schema {
 }
 
 // val is struct value
-func (y *Swaggos) buildStructSchema(v interface{}) spec.Schema {
+func (swaggos *Swaggos) buildStructSchema(v interface{}) spec.Schema {
 	typ := reflect.TypeOf(v)
 	val := reflect.ValueOf(v)
 	// if given nil interface{}, typ is nil, then we return a empty object schema
@@ -137,7 +138,7 @@ func (y *Swaggos) buildStructSchema(v interface{}) spec.Schema {
 	}
 	var schema spec.Schema
 	schema.Properties = make(spec.SchemaProperties)
-	schema.Type = spec.StringOrArray{Object}
+	schema.Type = spec.StringOrArray{_Object}
 	for i := 0; i < typ.NumField(); i++ {
 		field := val.Field(i)
 		fieldType := field.Type()
@@ -157,7 +158,7 @@ func (y *Swaggos) buildStructSchema(v interface{}) spec.Schema {
 				continue
 			} else {
 				// TODO:: if the field is a array type. what should we do here???
-				fieldSchema := y.buildSchema(field.Interface())
+				fieldSchema := swaggos.buildSchema(field.Interface())
 				for name, val := range fieldSchema.Properties {
 					schema.Properties[name] = val
 				}
@@ -176,31 +177,10 @@ func (y *Swaggos) buildStructSchema(v interface{}) spec.Schema {
 		if isBasicType(fieldType) {
 			prop = basicSchema(fieldType)
 		} else {
-			prop = y.buildSchema(field.Interface())
+			prop = swaggos.buildSchema(field.Interface())
 		}
 		prop = tg.mergeSchema(prop)
 		schema.Properties[fieldName] = prop
 	}
 	return schema
-}
-
-func (y *Swaggos) Response(status int, v interface{}) *Swaggos {
-	ref := y.Define(v)
-	if y.response == nil {
-		y.response = make(map[int]spec.Response)
-	}
-	y.response[status] = spec.Response{
-		ResponseProps: spec.ResponseProps{
-			Description: "json response",
-			Schema: &spec.Schema{
-				SchemaProps: spec.SchemaProps{
-					Ref: ref,
-				},
-			},
-			Examples: map[string]interface{}{
-				applicationJson: v,
-			},
-		},
-	}
-	return y
 }

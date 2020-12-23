@@ -1,8 +1,9 @@
 package swaggos
 
 import (
-	"github.com/go-openapi/spec"
 	"strings"
+
+	"github.com/go-openapi/spec"
 )
 
 // Group is a path group for same prefix
@@ -25,12 +26,12 @@ func NewGroup(prefix string, swaggos *Swaggos) *Group {
 func (g *Group) Header(name string, desc string, required bool) *Group {
 	param := spec.Parameter{
 		SimpleSchema: spec.SimpleSchema{
-			Type: String,
+			Type: _String,
 		},
 		ParamProps: spec.ParamProps{
 			Description: desc,
 			Name:        name,
-			In:          InHeader,
+			In:          _InHeader,
 			Required:    required,
 		},
 	}
@@ -42,12 +43,12 @@ func (g *Group) Header(name string, desc string, required bool) *Group {
 func (g *Group) Query(name string, desc string, required bool) *Group {
 	param := spec.Parameter{
 		SimpleSchema: spec.SimpleSchema{
-			Type: String,
+			Type: _String,
 		},
 		ParamProps: spec.ParamProps{
 			Description: desc,
 			Name:        name,
-			In:          InQuery,
+			In:          _InQuery,
 			Required:    required,
 		},
 	}
@@ -59,12 +60,12 @@ func (g *Group) Query(name string, desc string, required bool) *Group {
 func (g *Group) Form(name string, desc string, required bool) *Group {
 	param := spec.Parameter{
 		SimpleSchema: spec.SimpleSchema{
-			Type: String,
+			Type: _String,
 		},
 		ParamProps: spec.ParamProps{
 			Description: desc,
 			Name:        name,
-			In:          InForm,
+			In:          _InForm,
 			Required:    required,
 		},
 	}
@@ -118,6 +119,7 @@ func (g *Group) Swaggos() *Swaggos {
 	return g.swaggos
 }
 
-func (y *Swaggos) Group(path string) *Group {
-	return NewGroup(path, y)
+// Group setup the group of swaggos
+func (swaggos *Swaggos) Group(path string) *Group {
+	return NewGroup(path, swaggos)
 }

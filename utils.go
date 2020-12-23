@@ -1,31 +1,32 @@
 package swaggos
 
 import (
-	"github.com/go-openapi/spec"
 	"reflect"
 	"strings"
+
+	"github.com/go-openapi/spec"
 )
 
 const (
-	String  = "string"
-	Number  = "number"
-	Integer = "integer"
-	Boolean = "boolean"
-	Array   = "array"
-	File    = "file"
-	Object  = "object"
+	_String  = "string"
+	_Number  = "number"
+	_Integer = "integer"
+	_Boolean = "boolean"
+	_Array   = "array"
+	_File    = "file"
+	_Object  = "object"
 )
 
 const (
-	Int32    = "int32"
-	Int64    = "int64"
-	Float    = "float"
-	Double   = "double"
-	Byte     = "byte"
-	Binary   = "binary"
-	Date     = "date"
-	DateTime = "date-time"
-	Password = "password"
+	_Int32    = "int32"
+	_Int64    = "int64"
+	_Float    = "float"
+	_Double   = "double"
+	_Byte     = "byte"
+	_Binary   = "binary"
+	_Date     = "date"
+	_DateTime = "date-time"
+	_Password = "password"
 )
 
 func definitionRef(name string) spec.Ref {
@@ -43,7 +44,7 @@ func emptyObjectSchema() spec.Schema {
 func emptyArray() spec.Schema {
 	return spec.Schema{
 		SchemaProps: spec.SchemaProps{
-			Type:  spec.StringOrArray{Array},
+			Type:  spec.StringOrArray{_Array},
 			Items: &spec.SchemaOrArray{},
 		},
 	}
@@ -52,7 +53,7 @@ func emptyArray() spec.Schema {
 func arraySchema(schema *spec.Schema) spec.Schema {
 	return spec.Schema{
 		SchemaProps: spec.SchemaProps{
-			Type: spec.StringOrArray{Array},
+			Type: spec.StringOrArray{_Array},
 			Items: &spec.SchemaOrArray{
 				Schema: schema,
 			},
@@ -63,7 +64,7 @@ func arraySchema(schema *spec.Schema) spec.Schema {
 func arraySchemaRef(ref spec.Ref) spec.Schema {
 	return spec.Schema{
 		SchemaProps: spec.SchemaProps{
-			Type: spec.StringOrArray{Array},
+			Type: spec.StringOrArray{_Array},
 			Items: &spec.SchemaOrArray{
 				Schema: &spec.Schema{
 					SchemaProps: spec.SchemaProps{
@@ -134,27 +135,27 @@ func basicSchema(typ reflect.Type) spec.Schema {
 	case reflect.Bool:
 		return spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Type: spec.StringOrArray{Boolean},
+				Type: spec.StringOrArray{_Boolean},
 			},
 		}
 	case reflect.Int, reflect.Int64, reflect.Int8, reflect.Int32, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr, reflect.UnsafePointer:
 		return spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Type:   spec.StringOrArray{Integer},
-				Format: string(Int64),
+				Type:   spec.StringOrArray{_Integer},
+				Format: string(_Int64),
 			},
 		}
 	case reflect.Float64, reflect.Float32:
 		return spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Type:   spec.StringOrArray{Number},
-				Format: string(Float),
+				Type:   spec.StringOrArray{_Number},
+				Format: string(_Float),
 			},
 		}
 	case reflect.String:
 		return spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Type: spec.StringOrArray{String},
+				Type: spec.StringOrArray{_String},
 			},
 		}
 	default:

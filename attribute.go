@@ -6,6 +6,7 @@ import (
 	"strings"
 )
 
+// Attribute defines field attribute
 type Attribute struct {
 	Model       string      `json:"model"`
 	Description string      `json:"description"`
@@ -26,7 +27,7 @@ type Attribute struct {
 	MinItems  *int64        `json:"minItems,omitempty"`
 	Enum      []interface{} `json:"enum,omitempty"`
 	Ignore    bool          `json:"ignore"`
-	Json      string        `json:"json"`
+	JSON      string        `json:"json"`
 }
 
 func (a *Attribute) parseTag(t reflect.StructTag) {
@@ -61,11 +62,11 @@ func (a *Attribute) parseTag(t reflect.StructTag) {
 	a.Model = t.Get("model")
 	j := t.Get("json")
 	if j == "-" {
-		a.Json = "-"
+		a.JSON = "-"
 	} else {
-		a.Json = strings.Split(j, ",")[0]
+		a.JSON = strings.Split(j, ",")[0]
 	}
-	if a.Json == "-" || a.Model == "-" {
+	if a.JSON == "-" || a.Model == "-" {
 		a.Ignore = true
 	}
 	if ignore := t.Get("ignore"); ignore == "true" {

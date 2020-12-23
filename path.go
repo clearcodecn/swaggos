@@ -1,11 +1,12 @@
 package swaggos
 
 import (
-	"github.com/go-openapi/spec"
 	"strings"
+
+	"github.com/go-openapi/spec"
 )
 
-const applicationJson = "application/json"
+const applicationJSON = "application/json"
 
 const (
 	inForm = iota + 1
@@ -13,13 +14,14 @@ const (
 )
 
 const (
-	InPath   = "path"
-	InQuery  = "query"
-	InBody   = "body"
-	InHeader = "header"
-	InForm   = "formData"
+	_InPath   = "path"
+	_InQuery  = "query"
+	_InBody   = "body"
+	_InHeader = "header"
+	_InForm   = "formData"
 )
 
+// Path defines a router spec
 type Path struct {
 	prop spec.OperationProps
 
@@ -51,11 +53,11 @@ func (p *Path) parsePath(path string) {
 			}
 			p.prop.Parameters = append(p.prop.Parameters, spec.Parameter{
 				SimpleSchema: spec.SimpleSchema{
-					Type: String,
+					Type: _String,
 				},
 				ParamProps: spec.ParamProps{
 					Name:     name,
-					In:       InPath,
+					In:       _InPath,
 					Required: true,
 				},
 			})
@@ -103,7 +105,7 @@ func (p *Path) Form(name string, attribute Attribute) *Path {
 		ParamProps: spec.ParamProps{
 			Description: attribute.Description,
 			Name:        name,
-			In:          InForm,
+			In:          _InForm,
 			Required:    attribute.Required,
 		},
 	})
@@ -122,7 +124,7 @@ func (p *Path) FormObject(v interface{}) *Path {
 			SimpleSchema: spec.SimpleSchema{},
 			ParamProps: spec.ParamProps{
 				Name:   name,
-				In:     InForm,
+				In:     _InForm,
 				Schema: &sch,
 			},
 		}
@@ -147,12 +149,12 @@ func (p *Path) FormFile(name string, attribute Attribute) *Path {
 	p.paramDeep = inForm
 	p.prop.Parameters = append(p.prop.Parameters, spec.Parameter{
 		SimpleSchema: spec.SimpleSchema{
-			Type: File,
+			Type: _File,
 		},
 		ParamProps: spec.ParamProps{
 			Description: attribute.Description,
 			Name:        name,
-			In:          InForm,
+			In:          _InForm,
 			Required:    attribute.Required,
 		},
 	})
@@ -171,7 +173,7 @@ func (p *Path) Query(name string, attribute Attribute) *Path {
 		ParamProps: spec.ParamProps{
 			Description: attribute.Description,
 			Name:        name,
-			In:          InQuery,
+			In:          _InQuery,
 			Required:    attribute.Required,
 		},
 	})
@@ -186,7 +188,7 @@ func (p *Path) QueryObject(v interface{}) *Path {
 			SimpleSchema: spec.SimpleSchema{},
 			ParamProps: spec.ParamProps{
 				Name:   name,
-				In:     InQuery,
+				In:     _InQuery,
 				Schema: &sch,
 			},
 		}
@@ -207,7 +209,7 @@ func (p *Path) Header(name string, attribute Attribute) *Path {
 		ParamProps: spec.ParamProps{
 			Description: attribute.Description,
 			Name:        name,
-			In:          InHeader,
+			In:          _InHeader,
 			Required:    attribute.Required,
 		},
 	})
@@ -228,8 +230,8 @@ func (p *Path) Body(v interface{}) *Path {
 					Ref: ref,
 				},
 			},
-			In:   InBody,
-			Name: InBody,
+			In:   _InBody,
+			Name: _InBody,
 		},
 	})
 	return p
@@ -281,7 +283,7 @@ func (p *Path) addResponse(status int, ref spec.Ref, example interface{}) {
 				},
 			},
 			Examples: map[string]interface{}{
-				applicationJson: example,
+				applicationJSON: example,
 			},
 		},
 	}

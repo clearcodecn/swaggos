@@ -1,3 +1,0 @@
-# Examples
-
-- curd example

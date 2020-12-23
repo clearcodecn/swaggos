@@ -1,5 +1,6 @@
 package swaggos
 
+// Option option is swaggos option
 type Option func(o *Swaggos)
 
 // DefaultOptions is the default option with:
@@ -9,25 +10,28 @@ type Option func(o *Swaggos)
 func DefaultOptions() []Option {
 	return []Option{
 		WithJSON(),
-		WithHttp(),
-		WithHttps(),
+		WithHTTP(),
+		WithHTTPS(),
 	}
 }
 
+// WithJSON provide a json response
 func WithJSON() Option {
 	return func(o *Swaggos) {
-		o.Produces(applicationJson)
-		o.Consumes(applicationJson)
+		o.Produces(applicationJSON)
+		o.Consumes(applicationJSON)
 	}
 }
 
-func WithHttp() Option {
+// WithHTTP provide a HTTP protocol
+func WithHTTP() Option {
 	return func(o *Swaggos) {
 		o.schemas = append(o.schemas, "http")
 	}
 }
 
-func WithHttps() Option {
+// WithHTTPS provide a HTTPS protocol
+func WithHTTPS() Option {
 	return func(o *Swaggos) {
 		o.schemas = append(o.schemas, "https")
 	}

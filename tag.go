@@ -1,8 +1,9 @@
 package swaggos
 
 import (
-	"github.com/go-openapi/spec"
 	"reflect"
+
+	"github.com/go-openapi/spec"
 )
 
 type documentTag struct {
@@ -23,8 +24,8 @@ func (t *documentTag) name() string {
 	if t.attribute.Model != "" {
 		return t.attribute.Model
 	}
-	if t.attribute.Json != "" {
-		return t.attribute.Json
+	if t.attribute.JSON != "" {
+		return t.attribute.JSON
 	}
 	return ""
 }
@@ -46,7 +47,7 @@ func (t *documentTag) Attribute() *Attribute {
 }
 
 func (t *documentTag) jsonName() string {
-	return t.attribute.Json
+	return t.attribute.JSON
 }
 
 func (t *documentTag) mergeSchema(schema spec.Schema) spec.Schema {

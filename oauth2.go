@@ -2,72 +2,83 @@ package swaggos
 
 import (
 	"fmt"
+
 	"github.com/go-openapi/spec"
 )
 
-// Oauth2 create a oauth2 header
-func (y *Swaggos) Oauth2Password(tokenURL string, scopes []string) *Swaggos {
-	return y.Oauth2Config(Oauth2Config{
+// Oauth2Password setup swagger oauth2 by password
+func (swaggos *Swaggos) Oauth2Password(tokenURL string, scopes []string) *Swaggos {
+	return swaggos.Oauth2Config(Oauth2Config{
 		Flow:     PasswordFlow,
 		TokenURL: tokenURL,
 		Scopes:   scopes,
 	})
 }
 
-func (y *Swaggos) Oauth2Implicit(authURL string, scopes []string) *Swaggos {
-	return y.Oauth2Config(Oauth2Config{
-		AuthorizationUrl: authURL,
+// Oauth2Implicit setup swagger oauth2 by implicit
+func (swaggos *Swaggos) Oauth2Implicit(authURL string, scopes []string) *Swaggos {
+	return swaggos.Oauth2Config(Oauth2Config{
+		AuthorizationURL: authURL,
 		Flow:             ImplicitFlow,
 		Scopes:           scopes,
 	})
 }
 
-func (y *Swaggos) Oauth2Client(tokURL string, scopes []string) *Swaggos {
-	return y.Oauth2Config(Oauth2Config{
+// Oauth2Client setup swagger oauth2 by client
+func (swaggos *Swaggos) Oauth2Client(tokURL string, scopes []string) *Swaggos {
+	return swaggos.Oauth2Config(Oauth2Config{
 		TokenURL: tokURL,
 		Flow:     ApplicationFlow,
 		Scopes:   scopes,
 	})
 }
 
-func (y *Swaggos) Oauth2AccessCode(authURL string, tokURL string, scopes []string) *Swaggos {
-	return y.Oauth2Config(Oauth2Config{
+// Oauth2AccessCode setup swagger oauth2 by access code
+func (swaggos *Swaggos) Oauth2AccessCode(authURL string, tokURL string, scopes []string) *Swaggos {
+	return swaggos.Oauth2Config(Oauth2Config{
 		TokenURL:         tokURL,
-		AuthorizationUrl: authURL,
+		AuthorizationURL: authURL,
 		Flow:             AccessCodeFlow,
 		Scopes:           scopes,
 	})
 }
 
+// Oauth2Flow is the type of oauth2
 type Oauth2Flow string
 
 const (
-	AccessCodeFlow  Oauth2Flow = "accessCode"
-	ImplicitFlow               = "implicit"
-	PasswordFlow               = "password"
-	ApplicationFlow            = "application"
+	// AccessCodeFlow accessCode flow
+	AccessCodeFlow Oauth2Flow = "accessCode"
+	// ImplicitFlow implicit flow
+	ImplicitFlow = "implicit"
+	// PasswordFlow password flow
+	PasswordFlow = "password"
+	// ApplicationFlow application flow
+	ApplicationFlow = "application"
 )
 
+// Oauth2Config is config for oauth2
 type Oauth2Config struct {
 	Flow             Oauth2Flow
-	AuthorizationUrl string
+	AuthorizationURL string
 	TokenURL         string
 	Scopes           []string
 }
 
-func (y *Swaggos) Oauth2Config(config Oauth2Config) *Swaggos {
+// Oauth2Config setup oauth2 access type
+func (swaggos *Swaggos) Oauth2Config(config Oauth2Config) *Swaggos {
 	var schema *spec.SecurityScheme
 	switch config.Flow {
 	case AccessCodeFlow:
-		if config.AuthorizationUrl == "" || config.TokenURL == "" {
-			panic("AuthorizationUrl or TokenURL is empty")
+		if config.AuthorizationURL == "" || config.TokenURL == "" {
+			panic("AuthorizationURL or TokenURL is empty")
 		}
-		schema = spec.OAuth2AccessToken(config.AuthorizationUrl, config.TokenURL)
+		schema = spec.OAuth2AccessToken(config.AuthorizationURL, config.TokenURL)
 	case ImplicitFlow:
-		if config.AuthorizationUrl == "" {
-			panic("AuthorizationUrl or TokenURL is empty")
+		if config.AuthorizationURL == "" {
+			panic("AuthorizationURL or TokenURL is empty")
 		}
-		schema = spec.OAuth2Implicit(config.AuthorizationUrl)
+		schema = spec.OAuth2Implicit(config.AuthorizationURL)
 	case PasswordFlow:
 		if config.TokenURL == "" {
 			panic("TokenURL or TokenURL is empty")
@@ -84,7 +95,7 @@ func (y *Swaggos) Oauth2Config(config Oauth2Config) *Swaggos {
 	for _, scope := range config.Scopes {
 		schema.AddScope(scope, fmt.Sprintf("scope for: %s", scope))
 	}
-	return y.addAuth("Oauth2", schema, map[string][]string{
+	return swaggos.addAuth("Oauth2", schema, map[string][]string{
 		"Oauth2": config.Scopes,
 	})
 }
