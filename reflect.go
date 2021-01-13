@@ -54,9 +54,13 @@ func (swaggos *Swaggos) addDefinition(t interface{}, v spec.Schema) spec.Ref {
 	for {
 		// create a newName. like pkgName
 		if _, ok := swaggos.definitions[subName]; ok {
-			prefix := pkgPath[len(pkgPath)-i]
+			var prefix string
+			if len(pkgPath)-i > 0 {
+				prefix = pkgPath[len(pkgPath)-i]
+			} else {
+				i++
+			}
 			subName = fmt.Sprintf("%s.%s", prefix, name)
-			i++
 		} else {
 			name = subName
 			break
