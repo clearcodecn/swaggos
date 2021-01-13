@@ -36,7 +36,15 @@ func (swaggos *Swaggos) addDefinition(t interface{}, v spec.Schema) spec.Ref {
 			typ = reflect.Indirect(reflect.ValueOf(t)).Type()
 		}
 		if typ.Kind() == reflect.Slice || typ.Kind() == reflect.Array {
-			name = fmt.Sprintf("%sArray", typ.Elem().Name())
+			typ = typ.Elem()
+			for {
+				if typ.Kind() == reflect.Ptr {
+					typ = typ.Elem()
+				} else {
+					break
+				}
+			}
+			name = fmt.Sprintf("%sArray", typ.Name())
 		}
 	}
 	if name == "" {
