@@ -59,6 +59,7 @@ func (swaggos *Swaggos) addDefinition(t interface{}, v spec.Schema) spec.Ref {
 				prefix = pkgPath[len(pkgPath)-i]
 				i++
 			} else {
+				name = subName
 				break
 			}
 			subName = fmt.Sprintf("%s.%s", prefix, name)
