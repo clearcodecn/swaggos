@@ -25,7 +25,11 @@ func NewGroup(prefix string, swaggos *Swaggos) *Group {
 // Group returns a new group based on current group
 func (g *Group) Group(prefix string) *Group {
 	group := new(Group)
-	prefix = g.prefix + "/" + strings.Trim(prefix, "/")
+	if g.prefix == "/" {
+		prefix = g.prefix + strings.Trim(prefix, "/")
+	} else {
+		prefix = g.prefix + "/" + strings.Trim(prefix, "/")
+	}
 	group.prefix = prefix
 	group.swaggos = g.swaggos
 	group.params = make([]spec.Parameter, 0)
