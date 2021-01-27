@@ -22,6 +22,17 @@ func NewGroup(prefix string, swaggos *Swaggos) *Group {
 	return group
 }
 
+// Group returns a new group based on current group
+func (g *Group) Group(prefix string) *Group {
+	group := new(Group)
+	prefix = g.prefix + "/" + strings.Trim(prefix, "/")
+	group.prefix = prefix
+	group.swaggos = g.swaggos
+	group.params = make([]spec.Parameter, 0)
+	copy(group.params, g.params)
+	return group
+}
+
 // Header defines a header param
 func (g *Group) Header(name string, desc string, required bool) *Group {
 	param := spec.Parameter{
