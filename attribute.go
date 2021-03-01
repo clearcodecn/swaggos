@@ -33,7 +33,7 @@ type Attribute struct {
 func (a *Attribute) parseTag(t reflect.StructTag) {
 	a.Description = t.Get("description")
 	// required
-	a.Required = t.Get("nullable") == "true"
+	a.Required = t.Get("required") == "true"
 	example := t.Get("example")
 	if example != "" {
 		a.Example = example
