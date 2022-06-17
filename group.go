@@ -11,6 +11,7 @@ type Group struct {
 	prefix  string
 	swaggos *Swaggos
 	params  []spec.Parameter
+	tag     string
 }
 
 // NewGroup returns a new Group
@@ -33,8 +34,14 @@ func (g *Group) Group(prefix string) *Group {
 	group.prefix = prefix
 	group.swaggos = g.swaggos
 	group.params = make([]spec.Parameter, 0)
+	group.tag = g.tag
 	copy(group.params, g.params)
 	return group
+}
+
+func (g *Group) Tag(t string) *Group {
+	g.tag = t
+	return g
 }
 
 // Header defines a header param
@@ -91,37 +98,37 @@ func (g *Group) Form(name string, desc string, required bool) *Group {
 // Get create a path with group's prefix and given path of Get method
 func (g *Group) Get(path string) *Path {
 	p := g.swaggos.Get(g.trimPath(path))
-	return p.addParam(g.params...)
+	return p.addParam(g.params...).Tag(g.tag)
 }
 
 // Post create a path with group's prefix and given path of Post method
 func (g *Group) Post(path string) *Path {
 	p := g.swaggos.Post(g.trimPath(path))
-	return p.addParam(g.params...)
+	return p.addParam(g.params...).Tag(g.tag)
 }
 
 // Put create a path with group's prefix and given path of Put method
 func (g *Group) Put(path string) *Path {
 	p := g.swaggos.Put(g.trimPath(path))
-	return p.addParam(g.params...)
+	return p.addParam(g.params...).Tag(g.tag)
 }
 
 // Patch create a path with group's prefix and given path of Patch method
 func (g *Group) Patch(path string) *Path {
 	p := g.swaggos.Patch(g.trimPath(path))
-	return p.addParam(g.params...)
+	return p.addParam(g.params...).Tag(g.tag)
 }
 
 // Options create a path with group's prefix and given path of Options method
 func (g *Group) Options(path string) *Path {
 	p := g.swaggos.Options(g.trimPath(path))
-	return p.addParam(g.params...)
+	return p.addParam(g.params...).Tag(g.tag)
 }
 
 // Delete create a path with group's prefix and given path of Delete method
 func (g *Group) Delete(path string) *Path {
 	p := g.swaggos.Delete(g.trimPath(path))
-	return p.addParam(g.params...)
+	return p.addParam(g.params...).Tag(g.tag)
 }
 
 func (g *Group) trimPath(path string) string {

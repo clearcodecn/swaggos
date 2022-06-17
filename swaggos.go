@@ -111,6 +111,24 @@ func (swaggos *Swaggos) BasicAuth() *Swaggos {
 	return swaggos
 }
 
+// APIKeyAuth set api-key auth support
+// name is the key name
+// position is the key position such as: header/cookie/query
+func (swaggos *Swaggos) APIKeyAuth(name string, position string) *Swaggos {
+	def := spec.SecurityScheme{
+		SecuritySchemeProps: spec.SecuritySchemeProps{
+			Description: "apiKey auth",
+			Type:        "apiKey",
+			Name:        name,
+			In:          position,
+		},
+	}
+	swaggos.addAuth(`ApiKeyAuth`, &def, map[string][]string{
+		`ApiKeyAuth`: []string{},
+	})
+	return swaggos
+}
+
 // Header add a custom header
 func (swaggos *Swaggos) Header(name string, desc string, required bool) {
 	if swaggos.params == nil {

@@ -16,9 +16,11 @@ var (
 
 	//go:embed swaggerui/swagger-initializer.js
 	swaggerInitializerJs string
+
+	pathPrefix string
 )
 
-func UI(baseURL string) http.Handler {
+func UI(prefix string, baseURL string) http.Handler {
 	tpl, err := template.New("").Parse(swaggerInitializerJs)
 	if err != nil {
 		panic(err)
@@ -29,6 +31,7 @@ func UI(baseURL string) http.Handler {
 		panic(err)
 	}
 	swaggerInitializerJs = initBuf.String()
+	pathPrefix = prefix
 
 	var staticFS = fs.FS(swaggerUIFs)
 	swagFs, err := fs.Sub(staticFS, "swaggerui")
@@ -45,6 +48,8 @@ type initFileHandlerWrapper struct {
 }
 
 func (h *initFileHandlerWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	r.URL.Path = strings.TrimPrefix(r.URL.Path, pathPrefix)
+
 	if strings.HasSuffix(r.URL.Path, "swagger-initializer.js") {
 		w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
 		w.Write([]byte(swaggerInitializerJs))
