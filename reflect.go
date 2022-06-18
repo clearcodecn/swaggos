@@ -191,10 +191,27 @@ func (swaggos *Swaggos) buildStructSchema(v interface{}) spec.Schema {
 		if isBasicType(fieldType) {
 			prop = basicSchema(fieldType)
 		} else {
-			prop = swaggos.buildSchema(field.Interface())
+			if isDeepEqualObject(val, field) {
+				prop = emptyObjectSchema()
+			} else {
+				prop = swaggos.buildSchema(field.Interface())
+			}
 		}
 		prop = tg.mergeSchema(prop)
 		schema.Properties[fieldName] = prop
 	}
 	return schema
+}
+
+func isDeepEqualObject(parent reflect.Value, child reflect.Value) bool {
+	var childTyp = child.Type()
+	switch child.Type().Kind() {
+	case reflect.Array, reflect.Slice:
+		childTyp = reflect.TypeOf(child.Interface()).Elem()
+		if childTyp.Kind() == reflect.Ptr {
+			childTyp = childTyp.Elem()
+		}
+	}
+	fmt.Println(parent.Type(), childTyp)
+	return parent.Type() == childTyp
 }
