@@ -32,6 +32,15 @@ type Attribute struct {
 
 func (a *Attribute) parseTag(t reflect.StructTag) {
 	a.Description = t.Get("description")
+	if len(a.Description) == 0 {
+		a.Description = t.Get("desc")
+	}
+	if len(a.Description) == 0 {
+		a.Description = t.Get("doc")
+	}
+	if len(a.Description) == 0 {
+		a.Description = t.Get("comment")
+	}
 	// required
 	a.Required = t.Get("required") == "true"
 	example := t.Get("example")

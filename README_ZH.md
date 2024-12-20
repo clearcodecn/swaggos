@@ -208,9 +208,10 @@ swaggos 是一个golang版本的swagger文档生成器，提供了native code包
     => yaml format
 ```
 
-### 提供 http 服务
+### gin 集成 swagger ui 
 ```
-    http.Handle("/swagger",doc)
+    // 打开监听地址： http://localhost:端口/doc 访问. 
+    ginutils.Serve("/doc",doc,ginEngine,nil)
 ```
 
 > Tips: examples 目录下面有少量的示例
